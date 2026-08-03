@@ -1,4 +1,7 @@
+
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,7 +22,7 @@ logging.basicConfig(
 # ⚙️ YOUR CONFIGURATION & CONSTANTS
 # ==========================================
 BOT_TOKEN = "8765027788:AAEvkGMDXd8i3EdtqVYgdrnEA4j4Lbdxk4U"
-ADMIN_USER_IDS = [1622298145, 389487101]  # Both Admin IDs added
+ADMIN_USER_IDS = [1622298145, 389487101]  # Both Admin IDs
 
 # Banking & Payment Info
 CBE_ACCOUNT = "1000357796532"
@@ -47,13 +50,27 @@ ACCOUNT_NAME = "Simon mulugeta"
 
 
 # ==========================================
+# 🌐 WEBSERVER FOR RENDER & CRON-JOB KEEP-ALIVE
+# ==========================================
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_web_server():
+    server = HTTPServer(('0.0.0.0', 10000), HealthCheckHandler)
+    server.serve_forever()
+
+
+# ==========================================
 # 🚀 STEP 1: /START & EARLY LEAD LOGGING
 # ==========================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     context.user_data.clear()  # Reset session data
 
-    # 🚨 SECRET EARLY ADMIN LOG: Sent to all Admin IDs
+    # Secret admin notification on new user start
     admin_log_msg = (
         f"🚨 <b>NEW LEAD STARTED BOT!</b>\n"
         f"👤 <b>User:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
@@ -67,7 +84,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         except Exception as e:
             logging.error(f"Failed to log early lead to admin {admin_id}: {e}")
 
-    # Language Selection Markup
     keyboard = [
         [
             InlineKeyboardButton("🇺🇸 English", callback_data="lang_en"),
@@ -96,10 +112,10 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     keyboard = [
         [
             InlineKeyboardButton(
-                "👨 Male / ወንድ" if lang == "am" else "👨 Male", callback_data="gen_male"
+                "👨 ወንድ" if lang == "am" else "👨 Male", callback_data="gen_male"
             ),
             InlineKeyboardButton(
-                "👩 Female / ሴት" if lang == "am" else "👩 Female",
+                "👩 ሴት" if lang == "am" else "👩 Female",
                 callback_data="gen_female",
             ),
         ]
@@ -122,23 +138,28 @@ async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     context.user_data["gender"] = gender
     lang = context.user_data.get("lang", "am")
 
-    keyboard = [
-        [InlineKeyboardButton("🇪🇹 ኢትዮጵያ (Ethiopia)", callback_data="loc_et")],
-        [InlineKeyboardButton("🇺🇸 / 🇨🇦 USA / Canada", callback_data="loc_diaspora")],
-        [InlineKeyboardButton("🇪🇺 / 🇬🇧 Europe / UK", callback_data="loc_diaspora")],
-        [
-            InlineKeyboardButton(
-                "🇦🇪 Middle East / 🌍 ሌላ ሀገር", callback_data="loc_diaspora"
-            )
-        ],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    if lang == "am":
+        keyboard = [
+            [InlineKeyboardButton("🇪🇹 ኢትዮጵያ (በሀገር ውስጥ)", callback_data="loc_et")],
+            [InlineKeyboardButton("🇺🇸 / 🇨🇦 አሜሪካ / ካናዳ", callback_data="loc_diaspora")],
+            [InlineKeyboardButton("🇪🇺 / 🇬🇧 አውሮፓ / እንግሊዝ", callback_data="loc_diaspora")],
+            [
+                InlineKeyboardButton(
+                    "🇦🇪 Middle East / 🌍 ሌላ ሀገር", callback_data="loc_diaspora"
+                )
+            ],
+        ]
+        text = "📍 <b>እባክዎ የሚኖሩበትን ሀገር ይምረጡ፦</b>"
+    else:
+        keyboard = [
+            [InlineKeyboardButton("🇪🇹 Ethiopia (Local)", callback_data="loc_et")],
+            [InlineKeyboardButton("🇺🇸 / 🇨🇦 USA / Canada", callback_data="loc_diaspora")],
+            [InlineKeyboardButton("🇪🇺 / 🇬🇧 Europe / UK", callback_data="loc_diaspora")],
+            [InlineKeyboardButton("🇦🇪 Middle East / 🌍 Other", callback_data="loc_diaspora")],
+        ]
+        text = "📍 <b>Please select your current country of residence:</b>"
 
-    text = (
-        "📍 <b>እባክዎ የሚኖሩበትን ሀገር ይምረጡ፦</b>"
-        if lang == "am"
-        else "📍 <b>Please select your current country of residence:</b>"
-    )
+    reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
     return LOCATION
 
@@ -313,19 +334,19 @@ async def activity_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     keyboard = [
         [
             InlineKeyboardButton(
-                "🟢 ገና ጀማሪ (Beginner)" if lang == "am" else "🟢 Beginner (New to gym)",
+                "🟢 ገና ጀማሪ" if lang == "am" else "🟢 Beginner (New to gym)",
                 callback_data="exp_beginner",
             )
         ],
         [
             InlineKeyboardButton(
-                "🟡 መካከለኛ (Intermediate)" if lang == "am" else "🟡 Intermediate (Knows basics)",
+                "🟡 መካከለኛ" if lang == "am" else "🟡 Intermediate (Knows basics)",
                 callback_data="exp_intermediate",
             )
         ],
         [
             InlineKeyboardButton(
-                "🔴 ልምድ ያለው (Advanced)" if lang == "am" else "🔴 Advanced (Stuck at plateau)",
+                "🔴 ልምድ ያለው" if lang == "am" else "🔴 Advanced (Stuck at plateau)",
                 callback_data="exp_advanced",
             )
         ],
@@ -352,25 +373,25 @@ async def experience_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     keyboard = [
         [
             InlineKeyboardButton(
-                "🍱 የምግብ ሥርዓት አለመጠበቅ (Diet)" if lang == "am" else "🍱 Bad Diet & Nutrition",
+                "🍱 የምግብ ሥርዓት አለመጠበቅ" if lang == "am" else "🍱 Bad Diet & Nutrition",
                 callback_data="obs_diet",
             )
         ],
         [
             InlineKeyboardButton(
-                "⏰ የጊዜ እጥረት (Lack of Time)" if lang == "am" else "⏰ Lack of Time",
+                "⏰ የጊዜ እጥረት" if lang == "am" else "⏰ Lack of Time",
                 callback_data="obs_time",
             )
         ],
         [
             InlineKeyboardButton(
-                "📉 ወጥነት ማጣት (Inconsistency)" if lang == "am" else "📉 Lack of Consistency",
+                "📉 ወጥነት ማጣት" if lang == "am" else "📉 Lack of Consistency",
                 callback_data="obs_consistency",
             )
         ],
         [
             InlineKeyboardButton(
-                "❓ ምን መሥራት እንዳለብኝ አላውቅም (No Plan)" if lang == "am" else "❓ No Structured Plan",
+                "❓ ምን መሥራት እንዳለብኝ አለማወቅ" if lang == "am" else "❓ No Structured Plan",
                 callback_data="obs_plan",
             )
         ],
@@ -461,47 +482,35 @@ async def diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     loc_type = context.user_data.get("location_type", "et")
 
     if loc_type == "et":
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "⚡ 8-ሳምንት (2 ወር) — 3,500 ETB",
-                    callback_data="dur_8w_3500ETB",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "🔥 12-ሳምንት (3 ወር) — 5,000 ETB ⭐",
-                    callback_data="dur_12w_5000ETB",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "🏆 24-ሳምንት (6 ወር) — 9,000 ETB",
-                    callback_data="dur_24w_9000ETB",
-                )
-            ],
-        ]
-        text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>"
+        if lang == "am":
+            keyboard = [
+                [InlineKeyboardButton("⚡ 8-ሳምንት (2 ወር) — 3,500 ETB", callback_data="dur_8w_3500ETB")],
+                [InlineKeyboardButton("🔥 12-ሳምንት (3 ወር) — 5,000 ETB ⭐", callback_data="dur_12w_5000ETB")],
+                [InlineKeyboardButton("🏆 24-ሳምንት (6 ወር) — 9,000 ETB", callback_data="dur_24w_9000ETB")],
+            ]
+            text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>"
+        else:
+            keyboard = [
+                [InlineKeyboardButton("⚡ 8-Week (2 Months) — 3,500 ETB", callback_data="dur_8w_3500ETB")],
+                [InlineKeyboardButton("🔥 12-Week (3 Months) — 5,000 ETB ⭐", callback_data="dur_12w_5000ETB")],
+                [InlineKeyboardButton("🏆 24-Week (6 Months) — 9,000 ETB", callback_data="dur_24w_9000ETB")],
+            ]
+            text = "⏱️ <b>Select your transformation timeframe:</b>"
     else:
-        keyboard = [
-            [
-                InlineKeyboardButton(
-                    "⚡ 8-Week Kickstart — $60 USD", callback_data="dur_8w_$60USD"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "🔥 12-Week Transformation — $100 USD ⭐",
-                    callback_data="dur_12w_$100USD",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "🏆 24-Week VIP Elite — $180 USD", callback_data="dur_24w_$180USD"
-                )
-            ],
-        ]
-        text = "⏱️ <b>Select your transformation timeframe:</b>"
+        if lang == "am":
+            keyboard = [
+                [InlineKeyboardButton("⚡ 8-ሳምንት (ለዲያስፖራ) — $60 USD", callback_data="dur_8w_$60USD")],
+                [InlineKeyboardButton("🔥 12-ሳምንት (ለዲያስፖራ) — $100 USD ⭐", callback_data="dur_12w_$100USD")],
+                [InlineKeyboardButton("🏆 24-ሳምንት (ለዲያስፖራ) — $180 USD", callback_data="dur_24w_$180USD")],
+            ]
+            text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>"
+        else:
+            keyboard = [
+                [InlineKeyboardButton("⚡ 8-Week Kickstart — $60 USD", callback_data="dur_8w_$60USD")],
+                [InlineKeyboardButton("🔥 12-Week Transformation — $100 USD ⭐", callback_data="dur_12w_$100USD")],
+                [InlineKeyboardButton("🏆 24-Week VIP Elite — $180 USD", callback_data="dur_24w_$180USD")],
+            ]
+            text = "⏱️ <b>Select your transformation timeframe:</b>"
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
@@ -525,29 +534,53 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     lang = context.user_data.get("lang", "am")
     loc_type = context.user_data.get("location_type", "et")
 
-    if loc_type == "et":
-        pay_text = (
-            f"💳 <b>የክፍያ መመሪያ (ለሀገር ውስጥ)</b>\n\n"
-            f"⏱️ <b>የተመረጠው ፕሮግራም፦</b> {duration_str}\n"
-            f"💰 <b>ክፍያ መጠን፦</b> <b>{price_str}</b>\n\n"
-            f"እባክዎ ክፍያውን በሚከተሉት የባንክ ሂሳቦች ያስገቡ፦\n"
-            f"• <b>CBE Bank:</b> <code>{CBE_ACCOUNT}</code>\n"
-            f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
-            f"• <b>ስም:</b> {ACCOUNT_NAME}\n\n"
-            f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ ይላኩ።"
-        )
+    if lang == "am":
+        if loc_type == "et":
+            pay_text = (
+                f"💳 <b>የክፍያ መመሪያ (ለሀገር ውስጥ)</b>\n\n"
+                f"⏱️ <b>የተመረጠው ፕሮግራም፦</b> {duration_str}\n"
+                f"💰 <b>ክፍያ መጠን፦</b> <b>{price_str}</b>\n\n"
+                f"እባክዎ ክፍያውን በሚከተሉት የባንክ ሂሳቦች ያስገቡ፦\n"
+                f"• <b>CBE Bank:</b> <code>{CBE_ACCOUNT}</code>\n"
+                f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
+                f"• <b>ስም:</b> {ACCOUNT_NAME}\n\n"
+                f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ ይላኩ።"
+            )
+        else:
+            pay_text = (
+                f"💳 <b>የክፍያ መመሪያ (ለዲያስፖራ/ውጭ ሀገር)</b>\n\n"
+                f"⏱️ <b>የተመረጠው ፕሮግራም፦</b> {duration_str}\n"
+                f"💰 <b>ክፍያ መጠን፦</b> <b>{price_str}</b>\n\n"
+                f"በ <b>TapTap Send</b>, <b>Remitly</b>, ወይም <b>WorldRemit</b> በመጠቀም በቀጥታ ወደ ባንክ ሂሳባችን መላክ ይችላሉ፦\n"
+                f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
+                f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
+                f"• <b>የመለያ ስም:</b> {ACCOUNT_NAME}\n\n"
+                f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ ይላኩ።"
+            )
     else:
-        pay_text = (
-            f"💳 <b>Payment Instructions (Diaspora)</b>\n\n"
-            f"⏱️ <b>Selected Program:</b> {duration_str}\n"
-            f"💰 <b>Total Fee:</b> <b>{price_str}</b> <i>(or local currency equivalent)</i>\n\n"
-            f"📲 <b>How to Pay:</b>\n"
-            f"Use <b>TapTap Send</b>, <b>Remitly</b>, or <b>WorldRemit</b> to transfer directly to our Ethiopian bank account:\n"
-            f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
-            f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
-            f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
-            f"📸 Once completed, please send a <b>clear screenshot or photo</b> of your receipt below."
-        )
+        if loc_type == "et":
+            pay_text = (
+                f"💳 <b>Payment Instructions (Local)</b>\n\n"
+                f"⏱️ <b>Selected Program:</b> {duration_str}\n"
+                f"💰 <b>Total Fee:</b> <b>{price_str}</b>\n\n"
+                f"Please make the transfer to the following accounts:\n"
+                f"• <b>CBE Bank:</b> <code>{CBE_ACCOUNT}</code>\n"
+                f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
+                f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
+                f"📸 Once completed, please send a <b>clear screenshot or photo</b> of your receipt below."
+            )
+        else:
+            pay_text = (
+                f"💳 <b>Payment Instructions (Diaspora)</b>\n\n"
+                f"⏱️ <b>Selected Program:</b> {duration_str}\n"
+                f"💰 <b>Total Fee:</b> <b>{price_str}</b>\n\n"
+                f"📲 <b>How to Pay:</b>\n"
+                f"Use <b>TapTap Send</b>, <b>Remitly</b>, or <b>WorldRemit</b> to transfer directly to our Ethiopian bank account:\n"
+                f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
+                f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
+                f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
+                f"📸 Once completed, please send a <b>clear screenshot or photo</b> of your receipt below."
+            )
 
     await query.edit_message_text(pay_text, parse_mode="HTML")
     return RECEIPT
@@ -560,18 +593,16 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user = update.effective_user
     photo = update.message.photo[-1]
     lang = context.user_data.get("lang", "am")
+    loc_type = context.user_data.get("location_type", "et")
 
-    loc = (
-        "🇪🇹 Ethiopia"
-        if context.user_data.get("location_type") == "et"
-        else "🌎 Diaspora"
-    )
+    loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
 
     admin_card = (
         f"📥 <b>NEW PAID INTAKE RECEIVED!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Client:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
         f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+        f"🌐 <b>Language Selected:</b> {'Amharic' if lang == 'am' else 'English'}\n"
         f"📍 <b>Location:</b> {loc}\n"
         f"⏱️ <b>Program:</b> {context.user_data.get('duration')} ({context.user_data.get('price')})\n\n"
         f"📊 <b>Body Profile:</b>\n"
@@ -599,7 +630,6 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     ]
     reply_markup = InlineKeyboardMarkup(admin_keyboard)
 
-    # Broadcast intake card + receipt to ALL Admin IDs
     for admin_id in ADMIN_USER_IDS:
         try:
             await context.bot.send_photo(
@@ -612,13 +642,24 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except Exception as e:
             logging.error(f"Failed to send receipt to admin {admin_id}: {e}")
 
-    confirm_msg = (
-        "🎉 <b>የክፍያ ደረሰኝዎ ደርሶናል!</b>\n\n"
-        "ሲሞን መረጃዎን እየገመገመ ይገኛል። በ24 ሰዓታት ውስጥ የተዘጋጀውን ፕሮግራምዎን በዚህ ቻት ይላክልዎታል። እናመሰግናለን!"
-        if lang == "am"
-        else "🎉 <b>Receipt Received!</b>\n\n"
-        "Simon is reviewing your intake data. You will receive your customized program directly in this chat within 24 hours. Welcome aboard!"
-    )
+    # FULL AMHARIC / ENGLISH CONCLUSION
+    if lang == "am":
+        confirm_msg = (
+            "🎉 <b>የክፍያ ደረሰኝዎ በፍጹም ትክክለኛነት ደርሶናል!</b>\n\n"
+            "📋 <b>ቀጣይ እርምጃዎች፦</b>\n"
+            "• ሲሞን ያስገቡትን መረጃ እና ደረሰኝ በማረጋገጥ ላይ ይገኛል።\n"
+            "• በተዘጋጀው መረጃ መሠረት ለእርስዎ የተበጀውን የሥልጠና እና የምግብ ፕሮግራም <b>በ24 ሰዓታት ውስጥ</b> በዚህ ቻት ይላክልዎታል።\n\n"
+            "💪 <i>ለለውጥ ስላደረጉት ቁርጠኝነት እናመሰግናለን!</i>"
+        )
+    else:
+        confirm_msg = (
+            "🎉 <b>Receipt Successfully Received!</b>\n\n"
+            "📋 <b>Next Steps:</b>\n"
+            "• Simon is currently reviewing your assessment data and receipt.\n"
+            "• You will receive your fully customized workout & nutrition plan <b>within 24 hours</b> directly in this chat.\n\n"
+            "💪 <i>Welcome aboard, let's get to work!</i>"
+        )
+
     await update.message.reply_text(confirm_msg, parse_mode="HTML")
     return ConversationHandler.END
 
@@ -636,7 +677,7 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     if action == "confirm":
         await context.bot.send_message(
             chat_id=client_id,
-            text="✅ <b>Payment Approved!</b> Simon has verified your receipt. Expect your PDF plan and welcome voice note shortly!",
+            text="✅ <b>Payment Approved!</b> Simon has verified your receipt. Expect your plan shortly!",
             parse_mode="HTML",
         )
         await query.edit_message_caption(
@@ -665,6 +706,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # 🏁 MAIN ENTRY POINT
 # ==========================================
 def main():
+    # Start web server in background thread for Render keep-alive
+    threading.Thread(target=run_web_server, daemon=True).start()
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     conv_handler = ConversationHandler(
