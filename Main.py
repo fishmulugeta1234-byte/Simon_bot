@@ -1,4 +1,3 @@
-
 import logging
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -642,14 +641,14 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except Exception as e:
             logging.error(f"Failed to send receipt to admin {admin_id}: {e}")
 
-    # FULL AMHARIC / ENGLISH CONCLUSION
+    # FRIENDLY WARM FINISH (AMHARIC VS ENGLISH)
     if lang == "am":
         confirm_msg = (
-            "🎉 <b>የክፍያ ደረሰኝዎ በፍጹም ትክክለኛነት ደርሶናል!</b>\n\n"
-            "📋 <b>ቀጣይ እርምጃዎች፦</b>\n"
-            "• ሲሞን ያስገቡትን መረጃ እና ደረሰኝ በማረጋገጥ ላይ ይገኛል።\n"
-            "• በተዘጋጀው መረጃ መሠረት ለእርስዎ የተበጀውን የሥልጠና እና የምግብ ፕሮግራም <b>በ24 ሰዓታት ውስጥ</b> በዚህ ቻት ይላክልዎታል።\n\n"
-            "💪 <i>ለለውጥ ስላደረጉት ቁርጠኝነት እናመሰግናለን!</i>"
+            "🎉 <b>ደስ ብሎናል! የክፍያ ደረሰኝዎ በሰላም ደርሶናል!</b>\n\n"
+            "📋 <b>ቀጣይ እርምጃችን ምን ይሆናል?</b>\n"
+            "• ሲሞን ያስገቡትን መረጃ እና ደረሰኝ አሁን እየገመገመ ይገኛል።\n"
+            "• በእርስዎ ግብ እና ሁኔታ ልክ በጥንቃቄ የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b> እዚሁ ቻት ላይ ይላክልዎታል።\n\n"
+            "💪 <i>ወደ አዲሱ እና ጠንካራው ማንነትዎ ለሚያደርጉት ጉዞ እንኳን ደስ አለዎት! አብረን አስደናቂ ለውጥ እናመጣለን!</i>"
         )
     else:
         confirm_msg = (
