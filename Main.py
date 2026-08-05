@@ -661,37 +661,37 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     keyboard = [
         [
             InlineKeyboardButton(
-                "🥗 Meal Plan Only — 799 ETB",
+                "🥗 የምግብ እቅድ ብቻ (Meal Plan Only) — 799 ETB",
                 callback_data="dur_Meal_Plan_Only_799ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "🥉 Kickstart (21 Days) — 3,500 ETB",
+                "🥉 Blast 21 (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB",
                 callback_data="dur_Kickstart_(21_Days)_3500ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "🥈 Transformation (60 Days) — 7,000 ETB",
+                "🥈 Titan (60-ቀን የሰውነት ለውጥ) — 7,000 ETB",
                 callback_data="dur_Transformation_(60_Days)_7000ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "🥇 Elite Transformation (90 Days) — 9,500 ETB",
+                "🥇 Lifestyle Pro (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB",
                 callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "💎 Lifestyle Coaching (6 Months) — 18,000 ETB",
+                "💎 6-ወር የተሟላ የአኗኗር ዘይቤ — 18,000 ETB",
                 callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "👑 VIP Coaching (6 Months) — 30,000 ETB",
+                "👑 VIP Elite (6-ወር ቪአይፒ) — 30,000 ETB",
                 callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
             )
         ],
@@ -787,7 +787,7 @@ async def duration_choice(
           f"💳 <b>የክፍያ መመሪያ (ለዲያስፖራ/ውጭ ሀገር)</b>\n\n"
           f"⏱️ <b>የተመረጠው ፕሮግራም፦</b> {duration_str}\n"
           f"💰 <b>ክፍያ መጠን፦</b> <b>{price_str}</b>\n\n"
-          f"በ <b>Grey.co</b> virtual account በመጠቀም በቀጥታ መክፈል ይችላሉ፦\n"
+          f"በ <b>International Card ወይም Remittance (Wise / Western Union / Telebirr)</b> በመጠቀም በቀጥታ መክፈል ይችላሉ፦\n"
           f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
           f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
           f"• <b>የመለያ ስም:</b> {ACCOUNT_NAME}\n\n"
@@ -812,7 +812,7 @@ async def duration_choice(
           f"⏱️ <b>Selected Program:</b> {duration_str}\n"
           f"💰 <b>Total Fee:</b> <b>{price_str}</b>\n\n"
           f"📲 <b>How to Pay:</b>\n"
-          f"Use your <b>Grey.co</b> virtual account to complete payment:\n"
+          f"Use <b>International Cards, Wise, or Remittance apps (Western Union / Telebirr)</b> to complete payment:\n"
           f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
           f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
           f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
