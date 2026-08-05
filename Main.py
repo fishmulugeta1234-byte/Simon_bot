@@ -544,36 +544,36 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if loc_type == "et":
         if lang == "am":
             keyboard = [
-                [InlineKeyboardButton("🥉 Blast 21 (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB", callback_data="dur_Blast21_3500ETB")],
-                [InlineKeyboardButton("🥈 Titan (60-ቀን የሰውነት ለውጥ) — 7,000 ETB", callback_data="dur_Titan_7000ETB")],
-                [InlineKeyboardButton("🥇 Lifestyle Pro (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB", callback_data="dur_LifestylePro_9500ETB")],
-                [InlineKeyboardButton("💎 6-ወር የተሟላ የአኗኗር ዘይቤ — 18,000 ETB", callback_data="dur_6MonthLifestyle_18000ETB")],
-                [InlineKeyboardButton("👑 VIP Elite (6-ወር ቪአይፒ) — 30,000 ETB", callback_data="dur_VIPElite_30000ETB")],
+                [InlineKeyboardButton("🥉 Kickstart (21 Days) — 3,500 ETB", callback_data="dur_Kickstart_(21_Days)_3500ETB")],
+                [InlineKeyboardButton("🥈 Transformation (60 Days) — 7,000 ETB", callback_data="dur_Transformation_(60_Days)_7000ETB")],
+                [InlineKeyboardButton("🥇 Elite Transformation (90 Days) — 9,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_9500ETB")],
+                [InlineKeyboardButton("💎 Lifestyle Coaching (6 Months) — 18,000 ETB", callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB")],
+                [InlineKeyboardButton("👑 VIP Coaching (6 Months) — 30,000 ETB", callback_data="dur_VIP_Coaching_(6_Months)_30000ETB")],
             ]
         else:
             keyboard = [
-                [InlineKeyboardButton("🥉 Blast 21 — 3,500 ETB", callback_data="dur_Blast21_3500ETB")],
-                [InlineKeyboardButton("🥈 Titan — 7,000 ETB", callback_data="dur_Titan_7000ETB")],
-                [InlineKeyboardButton("🥇 Lifestyle Pro — 9,500 ETB", callback_data="dur_LifestylePro_9500ETB")],
-                [InlineKeyboardButton("💎 6-Month Complete Lifestyle — 18,000 ETB", callback_data="dur_6MonthLifestyle_18000ETB")],
-                [InlineKeyboardButton("👑 VIP Elite — 30,000 ETB", callback_data="dur_VIPElite_30000ETB")],
+                [InlineKeyboardButton("🥉 Kickstart (21 Days) — 3,500 ETB", callback_data="dur_Kickstart_(21_Days)_3500ETB")],
+                [InlineKeyboardButton("🥈 Transformation (60 Days) — 7,000 ETB", callback_data="dur_Transformation_(60_Days)_7000ETB")],
+                [InlineKeyboardButton("🥇 Elite Transformation (90 Days) — 9,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_9500ETB")],
+                [InlineKeyboardButton("💎 Lifestyle Coaching (6 Months) — 18,000 ETB", callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB")],
+                [InlineKeyboardButton("👑 VIP Coaching (6 Months) — 30,000 ETB", callback_data="dur_VIP_Coaching_(6_Months)_30000ETB")],
             ]
     else:
         if lang == "am":
             keyboard = [
-                [InlineKeyboardButton("🥉 Blast 21 — $99 USD", callback_data="dur_Blast21_$99USD")],
-                [InlineKeyboardButton("🥈 Titan — $199 USD", callback_data="dur_Titan_$199USD")],
-                [InlineKeyboardButton("🥇 Lifestyle Pro — $299 USD", callback_data="dur_LifestylePro_$299USD")],
-                [InlineKeyboardButton("💎 6-ወር የተሟላ የአኗኗር ዘይቤ — $599 USD", callback_data="dur_6MonthLifestyle_$599USD")],
-                [InlineKeyboardButton("👑 VIP Elite (6-ወር ቪአይፒ) — $999 USD", callback_data="dur_VIPElite_$999USD")],
+                [InlineKeyboardButton("🥉 Kickstart (21 Days) — $35", callback_data="dur_Kickstart_(21_Days)_$35")],
+                [InlineKeyboardButton("🥈 Transformation (60 Days) — $89", callback_data="dur_Transformation_(60_Days)_$89")],
+                [InlineKeyboardButton("🥇 Elite Transformation (90 Days) — $129", callback_data="dur_Elite_Transformation_(90_Days)_$129")],
+                [InlineKeyboardButton("💎 Lifestyle Coaching (6 Months) — $249", callback_data="dur_Lifestyle_Coaching_(6_Months)_$249")],
+                [InlineKeyboardButton("👑 VIP Coaching (6 Months) — $449", callback_data="dur_VIP_Coaching_(6_Months)_$449")],
             ]
         else:
             keyboard = [
-                [InlineKeyboardButton("🥉 Blast 21 — $99 USD", callback_data="dur_Blast21_$99USD")],
-                [InlineKeyboardButton("🥈 Titan — $199 USD", callback_data="dur_Titan_$199USD")],
-                [InlineKeyboardButton("🥇 Lifestyle Pro — $299 USD", callback_data="dur_LifestylePro_$299USD")],
-                [InlineKeyboardButton("💎 6-Month Complete Lifestyle — $599 USD", callback_data="dur_6MonthLifestyle_$599USD")],
-                [InlineKeyboardButton("👑 VIP Elite — $999 USD", callback_data="dur_VIPElite_$999USD")],
+                [InlineKeyboardButton("🥉 Kickstart (21 Days) — $35", callback_data="dur_Kickstart_(21_Days)_$35")],
+                [InlineKeyboardButton("🥈 Transformation (60 Days) — $89", callback_data="dur_Transformation_(60_Days)_$89")],
+                [InlineKeyboardButton("🥇 Elite Transformation (90 Days) — $129", callback_data="dur_Elite_Transformation_(90_Days)_$129")],
+                [InlineKeyboardButton("💎 Lifestyle Coaching (6 Months) — $249", callback_data="dur_Lifestyle_Coaching_(6_Months)_$249")],
+                [InlineKeyboardButton("👑 VIP Coaching (6 Months) — $449", callback_data="dur_VIP_Coaching_(6_Months)_$449")],
             ]
 
     text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>" if lang == "am" else "⏱️ <b>Select your transformation timeframe:</b>"
@@ -616,7 +616,7 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 f"💳 <b>የክፍያ መመሪያ (ለዲያስፖራ/ውጭ ሀገር)</b>\n\n"
                 f"⏱️ <b>የተመረጠው ፕሮግራም፦</b> {duration_str}\n"
                 f"💰 <b>ክፍያ መጠን፦</b> <b>{price_str}</b>\n\n"
-                f"በ <b>TapTap Send</b>, <b>Remitly</b>, ወይም <b>WorldRemit</b> በመጠቀም በቀጥታ ወደ ባንክ ሂሳባችን መላክ ይችላሉ፦\n"
+                f"በ <b>Grey.co</b> virtual account በመጠቀም በቀጥታ መክፈል ይችላሉ፦\n"
                 f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
                 f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
                 f"• <b>የመለያ ስም:</b> {ACCOUNT_NAME}\n\n"
@@ -640,7 +640,7 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 f"⏱️ <b>Selected Program:</b> {duration_str}\n"
                 f"💰 <b>Total Fee:</b> <b>{price_str}</b>\n\n"
                 f"📲 <b>How to Pay:</b>\n"
-                f"Use <b>TapTap Send</b>, <b>Remitly</b>, or <b>WorldRemit</b> to transfer directly to our Ethiopian bank account:\n"
+                f"Use your <b>Grey.co</b> virtual account to complete payment:\n"
                 f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
                 f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
                 f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
@@ -809,7 +809,7 @@ def main():
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
 
-    print("⚡ Simon Telegram Bot with Custom Packages is live...")
+    print("⚡ Simon Telegram Bot with Updated Packages is live...")
     app.run_polling()
 
 
