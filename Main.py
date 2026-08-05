@@ -544,36 +544,36 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if loc_type == "et":
         if lang == "am":
             keyboard = [
-                [InlineKeyboardButton("🥉 21-ቀን ኪክስታርት — 3,500 ETB", callback_data="dur_21d_3500ETB")],
-                [InlineKeyboardButton("🥈 60-ቀን ትራንስፎርሜሽን — 7,000 ETB", callback_data="dur_60d_7000ETB")],
-                [InlineKeyboardButton("🥇 90-ቀን ኤሊት — 9,500 ETB", callback_data="dur_90d_9500ETB")],
-                [InlineKeyboardButton("💎 6-ወር ላይፍስታይል — 18,000 ETB", callback_data="dur_6m_18000ETB")],
-                [InlineKeyboardButton("👑 6-ወር ቪአይፒ — 30,000 ETB", callback_data="dur_vip6m_30000ETB")],
+                [InlineKeyboardButton("🥉 Blast 21 (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB", callback_data="dur_Blast21_3500ETB")],
+                [InlineKeyboardButton("🥈 Titan (60-ቀን የሰውነት ለውጥ) — 7,000 ETB", callback_data="dur_Titan_7000ETB")],
+                [InlineKeyboardButton("🥇 Lifestyle Pro (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB", callback_data="dur_LifestylePro_9500ETB")],
+                [InlineKeyboardButton("💎 6-ወር የተሟላ የአኗኗር ዘይቤ — 18,000 ETB", callback_data="dur_6MonthLifestyle_18000ETB")],
+                [InlineKeyboardButton("👑 VIP Elite (6-ወር ቪአይፒ) — 30,000 ETB", callback_data="dur_VIPElite_30000ETB")],
             ]
         else:
             keyboard = [
-                [InlineKeyboardButton("🥉 21-Day Kickstart — 3,500 ETB", callback_data="dur_21d_3500ETB")],
-                [InlineKeyboardButton("🥈 60-Day Transformation — 7,000 ETB", callback_data="dur_60d_7000ETB")],
-                [InlineKeyboardButton("🥇 90-Day Elite Transformation — 9,500 ETB", callback_data="dur_90d_9500ETB")],
-                [InlineKeyboardButton("💎 6-Month Lifestyle Coaching — 18,000 ETB", callback_data="dur_6m_18000ETB")],
-                [InlineKeyboardButton("👑 6-Month VIP Coaching — 30,000 ETB", callback_data="dur_vip6m_30000ETB")],
+                [InlineKeyboardButton("🥉 Blast 21 — 3,500 ETB", callback_data="dur_Blast21_3500ETB")],
+                [InlineKeyboardButton("🥈 Titan — 7,000 ETB", callback_data="dur_Titan_7000ETB")],
+                [InlineKeyboardButton("🥇 Lifestyle Pro — 9,500 ETB", callback_data="dur_LifestylePro_9500ETB")],
+                [InlineKeyboardButton("💎 6-Month Complete Lifestyle — 18,000 ETB", callback_data="dur_6MonthLifestyle_18000ETB")],
+                [InlineKeyboardButton("👑 VIP Elite — 30,000 ETB", callback_data="dur_VIPElite_30000ETB")],
             ]
     else:
         if lang == "am":
             keyboard = [
-                [InlineKeyboardButton("🥉 21-ቀን ኪክስታርት (ለዲያስፖራ) — $99 USD", callback_data="dur_21d_$99USD")],
-                [InlineKeyboardButton("🥈 60-ቀን ትራንስፎርሜሽን (ለዲያስፖራ) — $199 USD", callback_data="dur_60d_$199USD")],
-                [InlineKeyboardButton("🥇 90-ቀን ኤሊት (ለዲያስፖራ) — $299 USD", callback_data="dur_90d_$299USD")],
-                [InlineKeyboardButton("💎 6-ወር ላይፍስታይል (ለዲያስፖራ) — $599 USD", callback_data="dur_6m_$599USD")],
-                [InlineKeyboardButton("👑 6-ወር ቪአይፒ (ለዲያስፖራ) — $999 USD", callback_data="dur_vip6m_$999USD")],
+                [InlineKeyboardButton("🥉 Blast 21 — $99 USD", callback_data="dur_Blast21_$99USD")],
+                [InlineKeyboardButton("🥈 Titan — $199 USD", callback_data="dur_Titan_$199USD")],
+                [InlineKeyboardButton("🥇 Lifestyle Pro — $299 USD", callback_data="dur_LifestylePro_$299USD")],
+                [InlineKeyboardButton("💎 6-ወር የተሟላ የአኗኗር ዘይቤ — $599 USD", callback_data="dur_6MonthLifestyle_$599USD")],
+                [InlineKeyboardButton("👑 VIP Elite (6-ወር ቪአይፒ) — $999 USD", callback_data="dur_VIPElite_$999USD")],
             ]
         else:
             keyboard = [
-                [InlineKeyboardButton("🥉 21-Day Kickstart — $99 USD", callback_data="dur_21d_$99USD")],
-                [InlineKeyboardButton("🥈 60-Day Transformation — $199 USD", callback_data="dur_60d_$199USD")],
-                [InlineKeyboardButton("🥇 90-Day Elite Transformation — $299 USD", callback_data="dur_90d_$299USD")],
-                [InlineKeyboardButton("💎 6-Month Lifestyle Coaching — $599 USD", callback_data="dur_6m_$599USD")],
-                [InlineKeyboardButton("👑 6-Month VIP Coaching — $999 USD", callback_data="dur_vip6m_$999USD")],
+                [InlineKeyboardButton("🥉 Blast 21 — $99 USD", callback_data="dur_Blast21_$99USD")],
+                [InlineKeyboardButton("🥈 Titan — $199 USD", callback_data="dur_Titan_$199USD")],
+                [InlineKeyboardButton("🥇 Lifestyle Pro — $299 USD", callback_data="dur_LifestylePro_$299USD")],
+                [InlineKeyboardButton("💎 6-Month Complete Lifestyle — $599 USD", callback_data="dur_6MonthLifestyle_$599USD")],
+                [InlineKeyboardButton("👑 VIP Elite — $999 USD", callback_data="dur_VIPElite_$999USD")],
             ]
 
     text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>" if lang == "am" else "⏱️ <b>Select your transformation timeframe:</b>"
@@ -662,7 +662,6 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
 
-    # Sends structured clean data to each column in Notion
     save_lead_to_notion(context.user_data, user)
 
     admin_card = (
@@ -810,7 +809,7 @@ def main():
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
 
-    print("⚡ Simon Telegram Bot with Secure Notion & Updated Packages is live...")
+    print("⚡ Simon Telegram Bot with Custom Packages is live...")
     app.run_polling()
 
 
