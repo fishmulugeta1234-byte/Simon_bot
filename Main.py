@@ -1,5 +1,7 @@
+import os
 import logging
 import threading
+import requests
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -28,6 +30,10 @@ CBE_ACCOUNT = "1000357796532"
 TELEBIRR_NUMBER = "0939998090"
 ACCOUNT_NAME = "Simon mulugeta"
 
+# Notion Configuration (Token pulled securely from Render environment variables)
+NOTION_TOKEN = os.getenv("NOTION_TOKEN", "YOUR_NOTION_INTEGRATION_SECRET_HERE")
+NOTION_DATABASE_ID = "3b3e7db3-44ce-81c4-b09d-002711ca0f56"
+
 # Conversation States
 (
     LANGUAGE,
@@ -43,13 +49,14 @@ ACCOUNT_NAME = "Simon mulugeta"
     READINESS,
     HEALTH_INJURIES,
     DIET_RESTRICTIONS,
+    PHONE,
     DURATION,
     RECEIPT,
-) = range(15)
+) = range(16)
 
 
 # ==========================================
-# 🌐 WEBSERVER FOR RENDER & CRON-JOB KEEP-ALIVE
+# 🌐 WEB SERVER FOR RENDER KEEP-ALIVE
 # ==========================================
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -63,13 +70,61 @@ def run_web_server():
 
 
 # ==========================================
+# 📓 NOTION ORGANIZED SYNC FUNCTION
+# ==========================================
+def save_lead_to_notion(user_data, user):
+    if not NOTION_TOKEN or NOTION_TOKEN == "YOUR_NOTION_INTEGRATION_SECRET_HERE":
+        logging.warning("Notion token not configured. Skipping Notion sync.")
+        return
+
+    url = "https://api.notion.com/v1/pages"
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+    }
+
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID},
+        "properties": {
+            "Name": {"title": [{"text": {"content": user.full_name}}]},
+            "Phone": {"phone_number": user_data.get("phone", "")},
+            "Telegram ID": {"number": int(user.id)},
+            "Username": {"rich_text": [{"text": {"content": user.username or "None"}}]},
+            "Program": {"rich_text": [{"text": {"content": user_data.get("duration", "")}}]},
+            "Price": {"rich_text": [{"text": {"content": user_data.get("price", "")}}]},
+            "Status": {"status": {"name": "Paid"}},
+            "Location": {"select": {"name": "Ethiopia" if user_data.get("location_type") == "et" else "Diaspora"}},
+            "Goal": {"select": {"name": user_data.get("goal", "General")}},
+            "Age": {"number": int(user_data.get("age", 0)) if user_data.get("age") else 0},
+            "Height": {"number": int(user_data.get("height", 0)) if user_data.get("height") else 0},
+            "Weight": {"number": int(user_data.get("weight", 0)) if user_data.get("weight") else 0},
+            "Gender": {"select": {"name": user_data.get("gender", "Unknown")}},
+            "Experience": {"select": {"name": user_data.get("experience", "Unknown")}},
+            "Obstacle": {"select": {"name": user_data.get("obstacle", "Unknown")}},
+            "Readiness": {"number": int(user_data.get("readiness", 0)) if user_data.get("readiness") else 0},
+            "Injuries": {"rich_text": [{"text": {"content": user_data.get("injuries", "None")}}]},
+            "Diet Dislikes": {"rich_text": [{"text": {"content": user_data.get("diet", "None")}}]},
+        }
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code != 200:
+            logging.error(f"Failed to save to Notion: {response.text}")
+        else:
+            logging.info("Successfully saved client to Notion database!")
+    except Exception as e:
+        logging.error(f"Exception while saving to Notion: {e}")
+
+
+# ==========================================
 # 🚀 STEP 1: /START & EARLY LEAD LOGGING
 # ==========================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
-    context.user_data.clear()  # Reset session data
+    context.user_data.clear()
 
-    # Secret admin notification on new user start
     admin_log_msg = (
         f"🚨 <b>NEW LEAD STARTED BOT!</b>\n"
         f"👤 <b>User:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
@@ -142,11 +197,7 @@ async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             [InlineKeyboardButton("🇪🇹 ኢትዮጵያ (በሀገር ውስጥ)", callback_data="loc_et")],
             [InlineKeyboardButton("🇺🇸 / 🇨🇦 አሜሪካ / ካናዳ", callback_data="loc_diaspora")],
             [InlineKeyboardButton("🇪🇺 / 🇬🇧 አውሮፓ / እንግሊዝ", callback_data="loc_diaspora")],
-            [
-                InlineKeyboardButton(
-                    "🇦🇪 Middle East / 🌍 ሌላ ሀገር", callback_data="loc_diaspora"
-                )
-            ],
+            [InlineKeyboardButton("🇦🇪 Middle East / 🌍 ሌላ ሀገር", callback_data="loc_diaspora")],
         ]
         text = "📍 <b>እባክዎ የሚኖሩበትን ሀገር ይምረጡ፦</b>"
     else:
@@ -440,7 +491,7 @@ async def obstacle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 # ==========================================
-# 🩺 STEP 7: HEALTH & DIETARY PROFILING
+# 🩺 STEP 7: HEALTH, DIET & PHONE COLLECTION
 # ==========================================
 async def readiness_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -472,52 +523,67 @@ async def health_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     return DIET_RESTRICTIONS
 
 
-# ==========================================
-# ⏱️ STEP 8: DURATION & PRICING
-# ==========================================
 async def diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = context.user_data.get("lang", "am")
     context.user_data["diet"] = update.message.text.strip()
+
+    text = (
+        "📞 <b>ለቀጣይ ክትትል የሚሆን ስልክ ቁጥርዎ ስንት ነው?</b> (ምሳሌ፡ 0911223344)"
+        if lang == "am"
+        else "📞 <b>What is your phone number for follow-up?</b> (e.g., +251911223344 or 0911223344)"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
+    return PHONE
+
+
+async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = context.user_data.get("lang", "am")
+    context.user_data["phone"] = update.message.text.strip()
     loc_type = context.user_data.get("location_type", "et")
 
     if loc_type == "et":
         if lang == "am":
             keyboard = [
-                [InlineKeyboardButton("⚡ 8-ሳምንት (2 ወር) — 3,500 ETB", callback_data="dur_8w_3500ETB")],
-                [InlineKeyboardButton("🔥 12-ሳምንት (3 ወር) — 5,000 ETB ⭐", callback_data="dur_12w_5000ETB")],
-                [InlineKeyboardButton("🏆 24-ሳምንት (6 ወር) — 9,000 ETB", callback_data="dur_24w_9000ETB")],
+                [InlineKeyboardButton("🥉 21-ቀን ኪክስታርት — 3,500 ETB", callback_data="dur_21d_3500ETB")],
+                [InlineKeyboardButton("🥈 60-ቀን ትራንስፎርሜሽን — 7,000 ETB", callback_data="dur_60d_7000ETB")],
+                [InlineKeyboardButton("🥇 90-ቀን ኤሊት — 9,500 ETB", callback_data="dur_90d_9500ETB")],
+                [InlineKeyboardButton("💎 6-ወር ላይፍስታይል — 18,000 ETB", callback_data="dur_6m_18000ETB")],
+                [InlineKeyboardButton("👑 6-ወር ቪአይፒ — 30,000 ETB", callback_data="dur_vip6m_30000ETB")],
             ]
-            text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>"
         else:
             keyboard = [
-                [InlineKeyboardButton("⚡ 8-Week (2 Months) — 3,500 ETB", callback_data="dur_8w_3500ETB")],
-                [InlineKeyboardButton("🔥 12-Week (3 Months) — 5,000 ETB ⭐", callback_data="dur_12w_5000ETB")],
-                [InlineKeyboardButton("🏆 24-Week (6 Months) — 9,000 ETB", callback_data="dur_24w_9000ETB")],
+                [InlineKeyboardButton("🥉 21-Day Kickstart — 3,500 ETB", callback_data="dur_21d_3500ETB")],
+                [InlineKeyboardButton("🥈 60-Day Transformation — 7,000 ETB", callback_data="dur_60d_7000ETB")],
+                [InlineKeyboardButton("🥇 90-Day Elite Transformation — 9,500 ETB", callback_data="dur_90d_9500ETB")],
+                [InlineKeyboardButton("💎 6-Month Lifestyle Coaching — 18,000 ETB", callback_data="dur_6m_18000ETB")],
+                [InlineKeyboardButton("👑 6-Month VIP Coaching — 30,000 ETB", callback_data="dur_vip6m_30000ETB")],
             ]
-            text = "⏱️ <b>Select your transformation timeframe:</b>"
     else:
         if lang == "am":
             keyboard = [
-                [InlineKeyboardButton("⚡ 8-ሳምንት (ለዲያስፖራ) — $60 USD", callback_data="dur_8w_$60USD")],
-                [InlineKeyboardButton("🔥 12-ሳምንት (ለዲያስፖራ) — $100 USD ⭐", callback_data="dur_12w_$100USD")],
-                [InlineKeyboardButton("🏆 24-ሳምንት (ለዲያስፖራ) — $180 USD", callback_data="dur_24w_$180USD")],
+                [InlineKeyboardButton("🥉 21-ቀን ኪክስታርት (ለዲያስፖራ) — $99 USD", callback_data="dur_21d_$99USD")],
+                [InlineKeyboardButton("🥈 60-ቀን ትራንስፎርሜሽን (ለዲያስፖራ) — $199 USD", callback_data="dur_60d_$199USD")],
+                [InlineKeyboardButton("🥇 90-ቀን ኤሊት (ለዲያስፖራ) — $299 USD", callback_data="dur_90d_$299USD")],
+                [InlineKeyboardButton("💎 6-ወር ላይፍስታይል (ለዲያስፖራ) — $599 USD", callback_data="dur_6m_$599USD")],
+                [InlineKeyboardButton("👑 6-ወር ቪአይፒ (ለዲያስፖራ) — $999 USD", callback_data="dur_vip6m_$999USD")],
             ]
-            text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>"
         else:
             keyboard = [
-                [InlineKeyboardButton("⚡ 8-Week Kickstart — $60 USD", callback_data="dur_8w_$60USD")],
-                [InlineKeyboardButton("🔥 12-Week Transformation — $100 USD ⭐", callback_data="dur_12w_$100USD")],
-                [InlineKeyboardButton("🏆 24-Week VIP Elite — $180 USD", callback_data="dur_24w_$180USD")],
+                [InlineKeyboardButton("🥉 21-Day Kickstart — $99 USD", callback_data="dur_21d_$99USD")],
+                [InlineKeyboardButton("🥈 60-Day Transformation — $199 USD", callback_data="dur_60d_$199USD")],
+                [InlineKeyboardButton("🥇 90-Day Elite Transformation — $299 USD", callback_data="dur_90d_$299USD")],
+                [InlineKeyboardButton("💎 6-Month Lifestyle Coaching — $599 USD", callback_data="dur_6m_$599USD")],
+                [InlineKeyboardButton("👑 6-Month VIP Coaching — $999 USD", callback_data="dur_vip6m_$999USD")],
             ]
-            text = "⏱️ <b>Select your transformation timeframe:</b>"
 
+    text = "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>" if lang == "am" else "⏱️ <b>Select your transformation timeframe:</b>"
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
     return DURATION
 
 
 # ==========================================
-# 💳 STEP 9: PAYMENT & RECEIPT UPLOAD
+# ⏱️ STEP 8: DURATION & PRICING
 # ==========================================
 async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -586,7 +652,7 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 # ==========================================
-# 📥 STEP 10: RECEIPT PROCESSING & ADMIN CARDS
+# 📥 STEP 9: RECEIPT PROCESSING & NOTION SYNC
 # ==========================================
 async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
@@ -596,12 +662,16 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
 
+    # Sends structured clean data to each column in Notion
+    save_lead_to_notion(context.user_data, user)
+
     admin_card = (
         f"📥 <b>NEW PAID INTAKE RECEIVED!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"👤 <b>Client:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
+        f"📞 <b>Phone:</b> {context.user_data.get('phone')}\n"
         f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
-        f"🌐 <b>Language Selected:</b> {'Amharic' if lang == 'am' else 'English'}\n"
+        f"🌐 <b>Language:</b> {'Amharic' if lang == 'am' else 'English'}\n"
         f"📍 <b>Location:</b> {loc}\n"
         f"⏱️ <b>Program:</b> {context.user_data.get('duration')} ({context.user_data.get('price')})\n\n"
         f"📊 <b>Body Profile:</b>\n"
@@ -641,12 +711,11 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         except Exception as e:
             logging.error(f"Failed to send receipt to admin {admin_id}: {e}")
 
-    # FRIENDLY WARM FINISH (AMHARIC VS ENGLISH)
     if lang == "am":
         confirm_msg = (
             "🎉 <b>ደስ ብሎናል! የክፍያ ደረሰኝዎ በሰላም ደርሶናል!</b>\n\n"
             "📋 <b>ቀጣይ እርምጃችን ምን ይሆናል?</b>\n"
-            "• ሲሞን ያስገቡትን መረጃ እና ደረሰኝ አሁን እየገመገመ ይገኛል።\n"
+            "• ሳይመን ያስገቡትን መረጃ እና ደረሰኝ አሁን እየገመገመ ይገኛል።\n"
             "• በእርስዎ ግብ እና ሁኔታ ልክ በጥንቃቄ የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b> እዚሁ ቻት ላይ ይላክልዎታል።\n\n"
             "💪 <i>ወደ አዲሱ እና ጠንካራው ማንነትዎ ለሚያደርጉት ጉዞ እንኳን ደስ አለዎት! አብረን አስደናቂ ለውጥ እናመጣለን!</i>"
         )
@@ -705,7 +774,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # 🏁 MAIN ENTRY POINT
 # ==========================================
 def main():
-    # Start web server in background thread for Render keep-alive
     threading.Thread(target=run_web_server, daemon=True).start()
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -730,6 +798,9 @@ def main():
             DIET_RESTRICTIONS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, diet_input)
             ],
+            PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, phone_input)
+            ],
             DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
             RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
         },
@@ -739,7 +810,7 @@ def main():
     app.add_handler(conv_handler)
     app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
 
-    print("⚡ Simon Telegram Bot is live and running...")
+    print("⚡ Simon Telegram Bot with Secure Notion & Updated Packages is live...")
     app.run_polling()
 
 
