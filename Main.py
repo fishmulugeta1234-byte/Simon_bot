@@ -135,29 +135,91 @@ def save_lead_to_google_sheet(user_data, user):
 
 
 # ==========================================
-# 📋 FAQ COMMAND (PROGRAM COMPARISON GUIDE)
+# 📋 FAQ COMMAND & PRICING HELPER
 # ==========================================
+def get_faq_text(loc):
+  if loc == "et":
+    return (
+        "📋 <b>Simon's Fitness Programs: Local Tier Guide (ETB)</b>\n\n"
+        "• <b>Meal Plan Only — 799 ETB:</b> Custom nutrition plan tailored to"
+        " your goals.\n\n"
+        "• <b>Kickstart (21 Days) — 3,500 ETB:</b> Best for beginners building"
+        " momentum. Includes fixed workout, 1 meal plan, 1 adjustment, and 3"
+        " check-ins.\n\n"
+        "• <b>Transformation (60 Days) — 7,000 ETB:</b> Best for fat loss &"
+        " muscle building. Includes workout updated every 4 weeks, adjusted meal"
+        " plan, 8 check-ins, and form reviews.\n\n"
+        "• <b>Elite (90 Days) — 9,500 ETB:</b> Best for serious long-term"
+        " results. Fully custom workouts, unlimited meal adjustments, ~13"
+        " check-ins, and 24-hr priority support.\n\n"
+        "• <b>Lifestyle (6 Months) — 18,000 ETB:</b> Best for permanent lifestyle"
+        " change. New workout phase monthly, continuous planning, ongoing"
+        " check-ins, and monthly goal setting.\n\n"
+        "• <b>VIP (6 Months) — 30,000 ETB:</b> Maximum 1-on-1 support."
+        " Live-adjusted plans, weekly video calls, unlimited messaging & form"
+        " reviews, and supplement guidance.\n\n"
+        f"❓ Have questions? Contact Simon directly at {SUPPORT_HANDLE}"
+    )
+  else:
+    return (
+        "📋 <b>Simon's Fitness Programs: Diaspora Tier Guide (USD)</b>\n\n"
+        "• <b>Meal Plan Only — $29.99:</b> Custom nutrition plan tailored to"
+        " your goals.\n\n"
+        "• <b>Kickstart (21 Days) — $35:</b> Best for beginners building"
+        " momentum. Includes fixed workout, 1 meal plan, 1 adjustment, and 3"
+        " check-ins.\n\n"
+        "• <b>Transformation (60 Days) — $89:</b> Best for fat loss & muscle"
+        " building. Includes workout updated every 4 weeks, adjusted meal plan,"
+        " 8 check-ins, and form reviews.\n\n"
+        "• <b>Elite (90 Days) — $129:</b> Best for serious long-term results."
+        " Fully custom workouts, unlimited meal adjustments, ~13 check-ins, and"
+        " 24-hr priority support.\n\n"
+        "• <b>Lifestyle (6 Months) — $249:</b> Best for permanent lifestyle"
+        " change. New workout phase monthly, continuous planning, ongoing"
+        " check-ins, and monthly goal setting.\n\n"
+        "• <b>VIP (6 Months) — $449:</b> Maximum 1-on-1 support. Live-adjusted"
+        " plans, weekly video calls, unlimited messaging & form reviews, and"
+        " supplement guidance.\n\n"
+        f"❓ Have questions? Contact Simon directly at {SUPPORT_HANDLE}"
+    )
+
+
 async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-  faq_text = (
-      "📋 <b>Simon's Fitness Programs: Tier Comparison Guide</b>\n\n"
-      "• <b>Kickstart (21 Days) — 3,500 ETB / $35:</b> Best for beginners"
-      " building momentum. Includes fixed workout, 1 meal plan, 1 adjustment,"
-      " and 3 check-ins.\n\n"
-      "• <b>Transformation (60 Days) — 7,000 ETB / $89:</b> Best for fat loss &"
-      " muscle building. Includes workout updated every 4 weeks, adjusted meal"
-      " plan, 8 check-ins, and form reviews.\n\n"
-      "• <b>Elite (90 Days) — 9,500 ETB / $129:</b> Best for serious long-term"
-      " results. Fully custom workouts, unlimited meal adjustments, ~13"
-      " check-ins, and 24-hr priority support.\n\n"
-      "• <b>Lifestyle (6 Months) — 18,000 ETB / $249:</b> Best for permanent"
-      " lifestyle change. New workout phase monthly, continuous planning,"
-      " ongoing check-ins, and monthly goal setting.\n\n"
-      "• <b>VIP (6 Months) — 30,000 ETB / $449:</b> Maximum 1-on-1 support."
-      " Live-adjusted plans, weekly video calls, unlimited messaging & form"
-      " reviews, and supplement guidance.\n\n"
-      f"❓ Have questions? Contact Simon directly at {SUPPORT_HANDLE}"
-  )
-  await update.message.reply_text(faq_text, parse_mode="HTML")
+  loc_type = context.user_data.get("location_type")
+
+  if loc_type == "et":
+    await update.message.reply_text(get_faq_text("et"), parse_mode="HTML")
+  elif loc_type == "diaspora":
+    await update.message.reply_text(get_faq_text("diaspora"), parse_mode="HTML")
+  else:
+    # If location is not set yet, let them choose which pricing guide to view
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🇪🇹 Local Pricing (ETB)", callback_data="faq_et"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🌎 Diaspora Pricing (USD)", callback_data="faq_diaspora"
+            )
+        ],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "📋 <b>Simon's Fitness Programs</b>\n\nPlease select your region to view"
+        " the correct program pricing tiers:",
+        reply_markup=reply_markup,
+        parse_mode="HTML",
+    )
+
+
+async def faq_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  query = update.callback_query
+  await query.answer()
+  loc = query.data.split("_")[1]
+  text = get_faq_text(loc)
+  await query.edit_message_text(text, parse_mode="HTML")
 
 
 # ==========================================
@@ -649,84 +711,164 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
   context.user_data["phone"] = update.message.text.strip()
   loc_type = context.user_data.get("location_type", "et")
 
-  if loc_type == "et":
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "🥗 የምግብ እቅድ ብቻ (Meal Plan Only) — 799 ETB",
-                callback_data="dur_Meal_Plan_Only_799ETB",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥉 Kickstart (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB",
-                callback_data="dur_Kickstart_(21_Days)_3500ETB",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥈 Transformation (60-ቀን የሰውነት ለውጥ) — 7,000 ETB",
-                callback_data="dur_Transformation_(60_Days)_7000ETB",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥇 Elite (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB",
-                callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "💎 Lifestyle (6-ወር የአኗኗር ዘይቤ) — 18,000 ETB",
-                callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "👑 VIP (6-ወር ቪአይፒ) — 30,000 ETB",
-                callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
-            )
-        ],
-    ]
+  if lang == "am":
+    if loc_type == "et":
+      keyboard = [
+          [
+              InlineKeyboardButton(
+                  "🥗 የምግብ እቅድ ብቻ (Meal Plan Only) — 799 ETB",
+                  callback_data="dur_Meal_Plan_Only_799ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 Kickstart (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB",
+                  callback_data="dur_Kickstart_(21_Days)_3500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 Transformation (60-ቀን የሰውነት ለውጥ) — 7,000 ETB",
+                  callback_data="dur_Transformation_(60_Days)_7000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB",
+                  callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6-ወር የአኗኗር ዘይቤ) — 18,000 ETB",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 VIP (6-ወር ቪአይፒ) — 30,000 ETB",
+                  callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
+              )
+          ],
+      ]
+    else:
+      keyboard = [
+          [
+              InlineKeyboardButton(
+                  "🥗 የምግብ እቅድ ብቻ (Meal Plan Only) — $29.99",
+                  callback_data="dur_Meal_Plan_Only_$29.99",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 Kickstart (21-ቀን ፈጣን ጅማሬ) — $35",
+                  callback_data="dur_Kickstart_(21_Days)_$35",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 Transformation (60-ቀን የሰውነት ለውጥ) — $89",
+                  callback_data="dur_Transformation_(60_Days)_$89",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ ስልጠና) — $129",
+                  callback_data="dur_Elite_Transformation_(90_Days)_$129",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6-ወር የአኗኗር ዘይቤ) — $249",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 VIP (6-ወር ቪአይፒ) — $449",
+                  callback_data="dur_VIP_Coaching_(6_Months)_$449",
+              )
+          ],
+      ]
   else:
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "🥗 Meal Plan Only — $29.99",
-                callback_data="dur_Meal_Plan_Only_$29.99",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥉 Kickstart (21 Days) — $35",
-                callback_data="dur_Kickstart_(21_Days)_$35",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥈 Transformation (60 Days) — $89",
-                callback_data="dur_Transformation_(60_Days)_$89",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥇 Elite (90 Days) — $129",
-                callback_data="dur_Elite_Transformation_(90_Days)_$129",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "💎 Lifestyle (6 Months) — $249",
-                callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "👑 VIP (6 Months) — $449",
-                callback_data="dur_VIP_Coaching_(6_Months)_$449",
-            )
-        ],
-    ]
+    if loc_type == "et":
+      keyboard = [
+          [
+              InlineKeyboardButton(
+                  "🥗 Meal Plan Only — 799 ETB",
+                  callback_data="dur_Meal_Plan_Only_799ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 Kickstart (21 Days) — 3,500 ETB",
+                  callback_data="dur_Kickstart_(21_Days)_3500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 Transformation (60 Days) — 7,000 ETB",
+                  callback_data="dur_Transformation_(60_Days)_7000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90 Days) — 9,500 ETB",
+                  callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6 Months) — 18,000 ETB",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 VIP (6 Months) — 30,000 ETB",
+                  callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
+              )
+          ],
+      ]
+    else:
+      keyboard = [
+          [
+              InlineKeyboardButton(
+                  "🥗 Meal Plan Only — $29.99",
+                  callback_data="dur_Meal_Plan_Only_$29.99",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 Kickstart (21 Days) — $35",
+                  callback_data="dur_Kickstart_(21_Days)_$35",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 Transformation (60 Days) — $89",
+                  callback_data="dur_Transformation_(60_Days)_$89",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90 Days) — $129",
+                  callback_data="dur_Elite_Transformation_(90_Days)_$129",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6 Months) — $249",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 VIP (6 Months) — $449",
+                  callback_data="dur_VIP_Coaching_(6_Months)_$449",
+              )
+          ],
+      ]
 
   text = (
       "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n"
@@ -754,7 +896,9 @@ async def duration_choice(
   data = query.data
   if "Meal_Plan_Only" in data:
     duration_str = "Meal Plan Only"
-    price_str = "799 ETB" if "799" in data else "$29.99"
+    price_str = (
+        "799 ETB" if "799" in data else ("$29.99" if "$29.99" in data else "$29.99")
+    )
   else:
     dur_info = data.split("_")[1:]
     duration_str = dur_info[0]
@@ -901,19 +1045,21 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         "🎉 <b>ደስ ብሎናል! የክፍያ ደረሰኝዎ በሰላም ደርሶናል!</b>\n\n"
         "📋 <b>ቀጣይ እርምጃችን ምን ይሆናል?</b>\n"
         "• ሳይመን ያስገቡትን መረጃ እና ደረሰኝ አሁን እየገመገመ ይገኛል።\n"
-        "• በእርስዎ ግብ እና ሁኔታ ልክ በጥንቃቄ የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን"
-        " <b>በ24 ሰዓታት ውስጥ</b> እዚሁ ቻት ላይ ይላክልዎታል።\n\n"
-        "💪 <i>ወደ አዲሱ እና ጠንካራው ማንነትዎ ለሚያደርጉት ጉዞ እንኳን ደስ አለዎት! አብረን"
-        " አስደናቂ ለውጥ እናመጣለን!</i>"
+        "• እርስዎ ይህንን ታላቅ መንገድ ጀምረዋል፤ አብረን አስደናቂ ለውጥ እናመጣለን እንዲሁም ግቦችዎን እንዲመቱ"
+        " እግዝዎታለሁ! የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b>"
+        " እዚሁ ቻት ላይ ይላክልዎታል።\n\n"
+        "💪 <i>ወደ አዲሱ እና ጠንካራው ማንነትዎ ለሚያደርጉት ጉዞ እንኳን ደስ አለዎት!</i>"
     )
   else:
     confirm_msg = (
         "🎉 <b>Receipt Successfully Received!</b>\n\n"
         "📋 <b>Next Steps:</b>\n"
         "• Simon is currently reviewing your assessment data and receipt.\n"
-        "• You will receive your fully customized workout & nutrition plan"
-        " <b>within 24 hours</b> directly in this chat.\n\n"
-        "💪 <i>Welcome aboard, let's get to work!</i>"
+        "• You are starting this great path, and we are going to create your"
+        " amazing transformation together to help you achieve your goals! You"
+        " will receive your fully customized plan <b>within 24 hours</b>"
+        " directly in this chat.\n\n"
+        "💪 <i>Welcome aboard, let's build something amazing together!</i>"
     )
 
   await update.message.reply_text(confirm_msg, parse_mode="HTML")
@@ -934,8 +1080,9 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await context.bot.send_message(
         chat_id=client_id,
         text=(
-            "✅ <b>Payment Approved!</b> Simon has verified your receipt."
-            " Expect your plan shortly!"
+            "✅ <b>Payment Approved!</b> Simon has verified your receipt. You"
+            " are starting this incredible path, and we're going to build your"
+            " amazing transformation together! Expect your custom plan shortly."
         ),
         parse_mode="HTML",
     )
@@ -971,8 +1118,9 @@ def main():
 
   app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-  # Add standalone FAQ command handler so users can query /faq anytime
+  # Add standalone FAQ command and callback handlers
   app.add_handler(CommandHandler("faq", faq_command))
+  app.add_handler(CallbackQueryHandler(faq_callback, pattern="^faq_"))
 
   conv_handler = ConversationHandler(
       entry_points=[CommandHandler("start", start)],
