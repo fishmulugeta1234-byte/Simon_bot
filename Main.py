@@ -38,10 +38,6 @@ SUPPORT_HANDLE = "@s_simon_19"
 GOOGLE_SHEET_NAME = "Fitness Clients"
 CREDENTIALS_FILE = "credentials.json"
 
-# Notion Configuration (Optional / Kept as backup)
-NOTION_TOKEN = os.getenv("NOTION_TOKEN", "YOUR_NOTION_INTEGRATION_SECRET_HERE")
-NOTION_DATABASE_ID = "3b3e7db3-44ce-81c4-b09d-002711ca0f56"
-
 # Conversation States
 (
     LANGUAGE,
@@ -94,43 +90,42 @@ def save_lead_to_google_sheet(user_data, user):
     client = gspread.authorize(creds)
     sheet = client.open(GOOGLE_SHEET_NAME).sheet1
 
-    # 1. Generate exact registration date and timestamp
-    registration_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Generate exact registration timestamp with short month format (e.g. 2026-Aug-06 07:41:17)
+    registration_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
 
-    # 2. Map row data to match spreadsheet columns
     row_data = [
-        registration_timestamp,  # Timestamp
-        user.full_name,  # Full Name
-        user.username or "None",  # Username
-        int(user.id),  # Telegram ID
-        user_data.get("phone", ""),  # Phone
+        registration_timestamp,
+        user.full_name,
+        user.username or "None",
+        int(user.id),
+        user_data.get("phone", ""),
         (
             "Ethiopia"
             if user_data.get("location_type") == "et"
             else "Diaspora"
-        ),  # Location
-        user_data.get("duration", ""),  # Program
-        user_data.get("price", ""),  # Price
-        "Paid",  # Status
-        user_data.get("gender", "Unknown"),  # Gender
-        int(user_data.get("age", 0)) if user_data.get("age") else 0,  # Age
+        ),
+        user_data.get("duration", ""),
+        user_data.get("price", ""),
+        "Paid",
+        user_data.get("gender", "Unknown"),
+        int(user_data.get("age", 0)) if user_data.get("age") else 0,
         (
             int(user_data.get("height", 0)) if user_data.get("height") else 0
-        ),  # Height
+        ),
         (
             int(user_data.get("weight", 0)) if user_data.get("weight") else 0
-        ),  # Weight
-        user_data.get("goal", "General"),  # Goal
-        user_data.get("activity", "Unknown"),  # Activity
-        user_data.get("experience", "Unknown"),  # Experience
-        user_data.get("obstacle", "Unknown"),  # Obstacle
+        ),
+        user_data.get("goal", "General"),
+        user_data.get("activity", "Unknown"),
+        user_data.get("experience", "Unknown"),
+        user_data.get("obstacle", "Unknown"),
         (
             int(user_data.get("readiness", 0))
             if user_data.get("readiness")
             else 0
-        ),  # Readiness
-        user_data.get("injuries", "None"),  # Injuries
-        user_data.get("diet", "None"),  # Diet Dislikes
+        ),
+        user_data.get("injuries", "None"),
+        user_data.get("diet", "None"),
     ]
 
     sheet.append_row(row_data)
@@ -844,7 +839,10 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
   loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
 
-  # Save lead directly to Google Sheets along with registration timestamp
+  # Generate exact registration timestamp with short month format (e.g. 2026-Aug-06 07:41:17)
+  registration_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
+
+  # Save lead and timestamp directly to Google Sheet
   save_lead_to_google_sheet(context.user_data, user)
 
   admin_card = (
@@ -853,6 +851,7 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
       f"👤 <b>Client:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
       f"📞 <b>Phone:</b> {context.user_data.get('phone')}\n"
       f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+      f"📅 <b>Registered At:</b> {registration_timestamp}\n"
       f"🌐 <b>Language:</b> {'Amharic' if lang == 'am' else 'English'}\n"
       f"📍 <b>Location:</b> {loc}\n"
       f"⏱️ <b>Program:</b> {context.user_data.get('duration')}"
