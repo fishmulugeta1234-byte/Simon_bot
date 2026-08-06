@@ -14,6 +14,7 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     MessageHandler,
+    PicklePersistence,
     filters,
 )
 
@@ -151,7 +152,8 @@ def get_faq_text(loc):
         " plan, 8 check-ins, and form reviews.\n\n"
         "• <b>Elite (90 Days) — 9,500 ETB:</b> Best for serious long-term"
         " results. Fully custom workouts, unlimited meal adjustments, ~13"
-        " check-ins, and 24-hr priority support.\n\n"
+        " check-ins, and 24-hr priority support. <i>(⚠️ Only 5 spots available"
+        " this month!)</i>\n\n"
         "• <b>Lifestyle (6 Months) — 18,000 ETB:</b> Best for permanent lifestyle"
         " change. New workout phase monthly, continuous planning, ongoing"
         " check-ins, and monthly goal setting.\n\n"
@@ -173,7 +175,8 @@ def get_faq_text(loc):
         " 8 check-ins, and form reviews.\n\n"
         "• <b>Elite (90 Days) — $129:</b> Best for serious long-term results."
         " Fully custom workouts, unlimited meal adjustments, ~13 check-ins, and"
-        " 24-hr priority support.\n\n"
+        " 24-hr priority support. <i>(⚠️ Only 5 spots available this"
+        " month!)</i>\n\n"
         "• <b>Lifestyle (6 Months) — $249:</b> Best for permanent lifestyle"
         " change. New workout phase monthly, continuous planning, ongoing"
         " check-ins, and monthly goal setting.\n\n"
@@ -192,7 +195,6 @@ async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
   elif loc_type == "diaspora":
     await update.message.reply_text(get_faq_text("diaspora"), parse_mode="HTML")
   else:
-    # If location is not set yet, let them choose which pricing guide to view
     keyboard = [
         [
             InlineKeyboardButton(
@@ -289,7 +291,7 @@ async def language_choice(
 
 
 # ==========================================
-# 📍 STEP 3: LOCATION SELECTION
+# 📍 STEP 3: LOCATION SELECTION & TEASER LINE
 # ==========================================
 async def gender_choice(
     update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -340,7 +342,7 @@ async def gender_choice(
 
 
 # ==========================================
-# 📊 STEP 4: VITAL BODY STATS
+# 📊 STEP 4: VITAL BODY STATS (WITH TEASER)
 # ==========================================
 async def location_choice(
     update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -352,12 +354,28 @@ async def location_choice(
   context.user_data["location_type"] = location_type
   lang = context.user_data.get("lang", "am")
 
-  text = (
+  # Send the requested teaser message before asking for age/height/weight
+  if lang == "am":
+    teaser_msg = (
+        "⏳ <b>በግምት በ3 ደቂቃ ውስጥ የእርስዎን ብጁ (Custom) ዕቅድ እናዘጋጃለን።</b>\n"
+        "ክብረወሰናችን፦ ከ2024 ጀምሮ ከ200 በላይ ሰዎችን ሰውነት ለውጠናል — አሁን የእርስዎ መሠረት"
+        " ይጀምራል!"
+    )
+  else:
+    teaser_msg = (
+        "⏳ <b>In about 3 minutes I'll put together your custom plan.</b>\nOver"
+        " 200 clients transformed since 2024 — let's get started!"
+    )
+
+  await query.edit_message_text(teaser_msg, parse_mode="HTML")
+
+  # Prompt for age immediately after
+  age_prompt = (
       "🎂 <b>ዕድሜዎ ስንት ነው?</b> (ምሳሌ፡ 25)"
       if lang == "am"
       else "🎂 <b>How old are you?</b> (e.g., 25)"
   )
-  await query.edit_message_text(text, parse_mode="HTML")
+  await query.message.reply_text(age_prompt, parse_mode="HTML")
   return AGE
 
 
@@ -734,7 +752,8 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB",
+                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ) ⚠️ (በዚህ ወር 5 ቦታዎች ብቻ!) —"
+                  " 9,500 ETB",
                   callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
               )
           ],
@@ -773,7 +792,8 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ ስልጠና) — $129",
+                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ) ⚠️ (Only 5 spots this month!)"
+                  " — $129",
                   callback_data="dur_Elite_Transformation_(90_Days)_$129",
               )
           ],
@@ -813,7 +833,8 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90 Days) — 9,500 ETB",
+                  "🥇 Elite (90 Days) ⚠️ (Only 5 spots this month!) — 9,500"
+                  " ETB",
                   callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
               )
           ],
@@ -852,7 +873,7 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90 Days) — $129",
+                  "🥇 Elite (90 Days) ⚠️ (Only 5 spots this month!) — $129",
                   callback_data="dur_Elite_Transformation_(90_Days)_$129",
               )
           ],
@@ -872,10 +893,13 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
   text = (
       "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n"
+      "⚠️ <i>ማስታወሻ፦ ለኤሊት (Elite) ፓኬጅ በዚህ ወር ተቀባይነት ያላቸው <b>5 ሰዎች ብቻ</b>"
+      " ናቸው!\n\n</i>"
       "💡 <i>የምርጫ ልዩነቶችን ለማየት /faq የሚለውን ትዕዛዝ መጠቀም ይችላሉ።</i>"
       if lang == "am"
       else (
-          "⏱️ <b>Select your transformation timeframe:</b>\n\n💡 <i>Type /faq"
+          "⏱️ <b>Select your transformation timeframe:</b>\n\n⚠️ <i>Note: Only"
+          " accepting 5 new Elite clients this month!\n\n</i>💡 <i>Type /faq"
           " anytime to review tier differences.</i>"
       )
   )
@@ -1111,12 +1135,20 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 # ==========================================
-# 🏁 MAIN ENTRY POINT
+# 🏁 MAIN ENTRY POINT WITH PERSISTENCE
 # ==========================================
 def main():
   threading.Thread(target=run_web_server, daemon=True).start()
 
-  app = ApplicationBuilder().token(BOT_TOKEN).build()
+  # Enable persistence so users never lose their progress if they drop off halfway
+  persistence = PicklePersistence(filepath="bot_persistence")
+
+  app = (
+      ApplicationBuilder()
+      .token(BOT_TOKEN)
+      .persistence(persistence)
+      .build()
+  )
 
   # Add standalone FAQ command and callback handlers
   app.add_handler(CommandHandler("faq", faq_command))
@@ -1153,13 +1185,16 @@ def main():
           RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
       },
       fallbacks=[CommandHandler("cancel", cancel)],
+      name="onboarding_conversation",
+      persistent=True,
   )
 
   app.add_handler(conv_handler)
   app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
 
   print(
-      "⚡ Simon Telegram Bot with Google Sheets & Timestamp Logging is live..."
+      "⚡ Simon Telegram Bot with Persistence, Google Sheets, & Teaser Lines is"
+      " live..."
   )
   app.run_polling()
 
