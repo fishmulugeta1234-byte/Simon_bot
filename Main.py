@@ -1,7 +1,10 @@
+from datetime import datetime
 import logging
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -29,8 +32,13 @@ ADMIN_USER_IDS = [1622298145, 389487101]  # Both Admin IDs
 CBE_ACCOUNT = "1000357796532"
 TELEBIRR_NUMBER = "0939998090"
 ACCOUNT_NAME = "Simon mulugeta"
+SUPPORT_HANDLE = "@s_simon_19"
 
-# Notion Configuration (Token pulled securely from Render environment variables)
+# Google Sheets Configuration
+GOOGLE_SHEET_NAME = "Fitness Clients"
+CREDENTIALS_FILE = "credentials.json"
+
+# Notion Configuration (Optional / Kept as backup)
 NOTION_TOKEN = os.getenv("NOTION_TOKEN", "YOUR_NOTION_INTEGRATION_SECRET_HERE")
 NOTION_DATABASE_ID = "3b3e7db3-44ce-81c4-b09d-002711ca0f56"
 
@@ -72,100 +80,89 @@ def run_web_server():
 
 
 # ==========================================
-# 📓 NOTION ORGANIZED SYNC FUNCTION
+# 📊 GOOGLE SHEETS & TIMESTAMP SYNC FUNCTION
 # ==========================================
-def save_lead_to_notion(user_data, user):
-  if not NOTION_TOKEN or NOTION_TOKEN == "YOUR_NOTION_INTEGRATION_SECRET_HERE":
-    logging.warning("Notion token not configured. Skipping Notion sync.")
-    return
-
-  url = "https://api.notion.com/v1/pages"
-  headers = {
-      "Authorization": f"Bearer {NOTION_TOKEN}",
-      "Content-Type": "application/json",
-      "Notion-Version": "2022-06-28",
-  }
-
-  payload = {
-      "parent": {"database_id": NOTION_DATABASE_ID},
-      "properties": {
-          "Name": {"title": [{"text": {"content": user.full_name}}]},
-          "Phone": {"phone_number": user_data.get("phone", "")},
-          "Telegram ID": {"number": int(user.id)},
-          "Username": {
-              "rich_text": [{"text": {"content": user.username or "None"}}]
-          },
-          "Program": {
-              "rich_text": [{"text": {"content": user_data.get("duration", "")}}]
-          },
-          "Price": {
-              "rich_text": [{"text": {"content": user_data.get("price", "")}}]
-          },
-          "Status": {"status": {"name": "Paid"}},
-          "Location": {
-              "select": {
-                  "name": (
-                      "Ethiopia"
-                      if user_data.get("location_type") == "et"
-                      else "Diaspora"
-                  )
-              }
-          },
-          "Goal": {"select": {"name": user_data.get("goal", "General")}},
-          "Age": {
-              "number": (
-                  int(user_data.get("age", 0)) if user_data.get("age") else 0
-              )
-          },
-          "Height": {
-              "number": (
-                  int(user_data.get("height", 0))
-                  if user_data.get("height")
-                  else 0
-              )
-          },
-          "Weight": {
-              "number": (
-                  int(user_data.get("weight", 0))
-                  if user_data.get("weight")
-                  else 0
-              )
-          },
-          "Gender": {"select": {"name": user_data.get("gender", "Unknown")}},
-          "Experience": {
-              "select": {"name": user_data.get("experience", "Unknown")}
-          },
-          "Obstacle": {
-              "select": {"name": user_data.get("obstacle", "Unknown")}
-          },
-          "Readiness": {
-              "number": (
-                  int(user_data.get("readiness", 0))
-                  if user_data.get("readiness")
-                  else 0
-              )
-          },
-          "Injuries": {
-              "rich_text": [
-                  {"text": {"content": user_data.get("injuries", "None")}}
-              ]
-          },
-          "Diet Dislikes": {
-              "rich_text": [
-                  {"text": {"content": user_data.get("diet", "None")}}
-              ]
-          },
-      },
-  }
-
+def save_lead_to_google_sheet(user_data, user):
   try:
-    response = requests.post(url, json=payload, headers=headers)
-    if response.status_code != 200:
-      logging.error(f"Failed to save to Notion: {response.text}")
-    else:
-      logging.info("Successfully saved client to Notion database!")
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive",
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+        CREDENTIALS_FILE, scope
+    )
+    client = gspread.authorize(creds)
+    sheet = client.open(GOOGLE_SHEET_NAME).sheet1
+
+    # 1. Generate exact registration date and timestamp
+    registration_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 2. Map row data to match spreadsheet columns
+    row_data = [
+        registration_timestamp,  # Timestamp
+        user.full_name,  # Full Name
+        user.username or "None",  # Username
+        int(user.id),  # Telegram ID
+        user_data.get("phone", ""),  # Phone
+        (
+            "Ethiopia"
+            if user_data.get("location_type") == "et"
+            else "Diaspora"
+        ),  # Location
+        user_data.get("duration", ""),  # Program
+        user_data.get("price", ""),  # Price
+        "Paid",  # Status
+        user_data.get("gender", "Unknown"),  # Gender
+        int(user_data.get("age", 0)) if user_data.get("age") else 0,  # Age
+        (
+            int(user_data.get("height", 0)) if user_data.get("height") else 0
+        ),  # Height
+        (
+            int(user_data.get("weight", 0)) if user_data.get("weight") else 0
+        ),  # Weight
+        user_data.get("goal", "General"),  # Goal
+        user_data.get("activity", "Unknown"),  # Activity
+        user_data.get("experience", "Unknown"),  # Experience
+        user_data.get("obstacle", "Unknown"),  # Obstacle
+        (
+            int(user_data.get("readiness", 0))
+            if user_data.get("readiness")
+            else 0
+        ),  # Readiness
+        user_data.get("injuries", "None"),  # Injuries
+        user_data.get("diet", "None"),  # Diet Dislikes
+    ]
+
+    sheet.append_row(row_data)
+    logging.info("Successfully saved client and timestamp to Google Sheet!")
   except Exception as e:
-    logging.error(f"Exception while saving to Notion: {e}")
+    logging.error(f"Exception while saving to Google Sheet: {e}")
+
+
+# ==========================================
+# 📋 FAQ COMMAND (PROGRAM COMPARISON GUIDE)
+# ==========================================
+async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  faq_text = (
+      "📋 <b>Simon's Fitness Programs: Tier Comparison Guide</b>\n\n"
+      "• <b>Kickstart (21 Days) — 3,500 ETB / $35:</b> Best for beginners"
+      " building momentum. Includes fixed workout, 1 meal plan, 1 adjustment,"
+      " and 3 check-ins.\n\n"
+      "• <b>Transformation (60 Days) — 7,000 ETB / $89:</b> Best for fat loss &"
+      " muscle building. Includes workout updated every 4 weeks, adjusted meal"
+      " plan, 8 check-ins, and form reviews.\n\n"
+      "• <b>Elite (90 Days) — 9,500 ETB / $129:</b> Best for serious long-term"
+      " results. Fully custom workouts, unlimited meal adjustments, ~13"
+      " check-ins, and 24-hr priority support.\n\n"
+      "• <b>Lifestyle (6 Months) — 18,000 ETB / $249:</b> Best for permanent"
+      " lifestyle change. New workout phase monthly, continuous planning,"
+      " ongoing check-ins, and monthly goal setting.\n\n"
+      "• <b>VIP (6 Months) — 30,000 ETB / $449:</b> Maximum 1-on-1 support."
+      " Live-adjusted plans, weekly video calls, unlimited messaging & form"
+      " reviews, and supplement guidance.\n\n"
+      f"❓ Have questions? Contact Simon directly at {SUPPORT_HANDLE}"
+  )
+  await update.message.reply_text(faq_text, parse_mode="HTML")
 
 
 # ==========================================
@@ -198,7 +195,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
   await update.message.reply_text(
       "Welcome to Simon's Transformation Portal! Please select your language /"
-      " እባክዎ ቋንቋ ይምረጡ፦",
+      " እባክዎ ቋንቋ ይምረጡ፦\n\n<i>(Type /faq anytime to compare program tiers)</i>",
       reply_markup=reply_markup,
   )
   return LANGUAGE
@@ -667,31 +664,31 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         ],
         [
             InlineKeyboardButton(
-                "🥉 Blast 21 (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB",
+                "🥉 Kickstart (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB",
                 callback_data="dur_Kickstart_(21_Days)_3500ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "🥈 Titan (60-ቀን የሰውነት ለውጥ) — 7,000 ETB",
+                "🥈 Transformation (60-ቀን የሰውነት ለውጥ) — 7,000 ETB",
                 callback_data="dur_Transformation_(60_Days)_7000ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "🥇 Lifestyle Pro (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB",
+                "🥇 Elite (90-ቀን ከፍተኛ ደረጃ ስልጠና) — 9,500 ETB",
                 callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "💎 6-ወር የተሟላ የአኗኗር ዘይቤ — 18,000 ETB",
+                "💎 Lifestyle (6-ወር የአኗኗር ዘይቤ) — 18,000 ETB",
                 callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
             )
         ],
         [
             InlineKeyboardButton(
-                "👑 VIP Elite (6-ወር ቪአይፒ) — 30,000 ETB",
+                "👑 VIP (6-ወር ቪአይፒ) — 30,000 ETB",
                 callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
             )
         ],
@@ -718,28 +715,32 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         ],
         [
             InlineKeyboardButton(
-                "🥇 Elite Transformation (90 Days) — $129",
+                "🥇 Elite (90 Days) — $129",
                 callback_data="dur_Elite_Transformation_(90_Days)_$129",
             )
         ],
         [
             InlineKeyboardButton(
-                "💎 Lifestyle Coaching (6 Months) — $249",
+                "💎 Lifestyle (6 Months) — $249",
                 callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
             )
         ],
         [
             InlineKeyboardButton(
-                "👑 VIP Coaching (6 Months) — $449",
+                "👑 VIP (6 Months) — $449",
                 callback_data="dur_VIP_Coaching_(6_Months)_$449",
             )
         ],
     ]
 
   text = (
-      "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>"
+      "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n"
+      "💡 <i>የምርጫ ልዩነቶችን ለማየት /faq የሚለውን ትዕዛዝ መጠቀም ይችላሉ።</i>"
       if lang == "am"
-      else "⏱️ <b>Select your transformation timeframe:</b>"
+      else (
+          "⏱️ <b>Select your transformation timeframe:</b>\n\n💡 <i>Type /faq"
+          " anytime to review tier differences.</i>"
+      )
   )
   reply_markup = InlineKeyboardMarkup(keyboard)
   await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
@@ -780,18 +781,23 @@ async def duration_choice(
           f"• <b>CBE Bank:</b> <code>{CBE_ACCOUNT}</code>\n"
           f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
           f"• <b>ስም:</b> {ACCOUNT_NAME}\n\n"
-          f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ ይላኩ።"
+          f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ"
+          f" ይላኩ።\n\n"
+          f"❓ <b>ጥያቄ ካለዎት በቀጥታ ያግኙን፦</b> {SUPPORT_HANDLE}"
       )
     else:
       pay_text = (
           f"💳 <b>የክፍያ መመሪያ (ለዲያስፖራ/ውጭ ሀገር)</b>\n\n"
           f"⏱️ <b>የተመረጠው ፕሮግራም፦</b> {duration_str}\n"
           f"💰 <b>ክፍያ መጠን፦</b> <b>{price_str}</b>\n\n"
-          f"በ <b>International Card ወይም Remittance (Wise / Western Union / Telebirr)</b> በመጠቀም በቀጥታ መክፈል ይችላሉ፦\n"
+          f"በ <b>International Card ወይም Remittance (Wise / Western Union /"
+          f" Telebirr)</b> በመጠቀም በቀጥታ መክፈል ይችላሉ፦\n"
           f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
           f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
           f"• <b>የመለያ ስም:</b> {ACCOUNT_NAME}\n\n"
-          f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ ይላኩ።"
+          f"📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን <b>ግልጽ ስክሪንሽኦት ወይም ፎቶ</b> እዚህ"
+          f" ይላኩ።\n\n"
+          f"❓ <b>ጥያቄ ካለዎት በቀጥታ ያግኙን፦</b> {SUPPORT_HANDLE}"
       )
   else:
     if loc_type == "et":
@@ -804,7 +810,8 @@ async def duration_choice(
           f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
           f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
           f"📸 Once completed, please send a <b>clear screenshot or photo</b> of"
-          " your receipt below."
+          f" your receipt below.\n\n"
+          f"❓ <b>Questions? Contact Simon directly:</b> {SUPPORT_HANDLE}"
       )
     else:
       pay_text = (
@@ -812,12 +819,14 @@ async def duration_choice(
           f"⏱️ <b>Selected Program:</b> {duration_str}\n"
           f"💰 <b>Total Fee:</b> <b>{price_str}</b>\n\n"
           f"📲 <b>How to Pay:</b>\n"
-          f"Use <b>International Cards, Wise, or Remittance apps (Western Union / Telebirr)</b> to complete payment:\n"
+          f"Use <b>International Cards, Wise, or Remittance apps (Western Union"
+          f" / Telebirr)</b> to complete payment:\n"
           f"• <b>CBE Account:</b> <code>{CBE_ACCOUNT}</code>\n"
           f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n"
           f"• <b>Account Name:</b> {ACCOUNT_NAME}\n\n"
           f"📸 Once completed, please send a <b>clear screenshot or photo</b> of"
-          " your receipt below."
+          f" your receipt below.\n\n"
+          f"❓ <b>Questions? Contact Simon directly:</b> {SUPPORT_HANDLE}"
       )
 
   await query.edit_message_text(pay_text, parse_mode="HTML")
@@ -825,7 +834,7 @@ async def duration_choice(
 
 
 # ==========================================
-# 📥 STEP 9: RECEIPT PROCESSING & NOTION SYNC
+# 📥 STEP 9: RECEIPT PROCESSING & GOOGLE SHEET SYNC
 # ==========================================
 async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
   user = update.effective_user
@@ -835,7 +844,8 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
   loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
 
-  save_lead_to_notion(context.user_data, user)
+  # Save lead directly to Google Sheets along with registration timestamp
+  save_lead_to_google_sheet(context.user_data, user)
 
   admin_card = (
       f"📥 <b>NEW PAID INTAKE RECEIVED!</b>\n"
@@ -962,6 +972,9 @@ def main():
 
   app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+  # Add standalone FAQ command handler so users can query /faq anytime
+  app.add_handler(CommandHandler("faq", faq_command))
+
   conv_handler = ConversationHandler(
       entry_points=[CommandHandler("start", start)],
       states={
@@ -998,7 +1011,9 @@ def main():
   app.add_handler(conv_handler)
   app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
 
-  print("⚡ Simon Telegram Bot with Meal Plan Only Tier is live...")
+  print(
+      "⚡ Simon Telegram Bot with Google Sheets & Timestamp Logging is live..."
+  )
   app.run_polling()
 
 
