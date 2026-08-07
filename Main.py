@@ -39,7 +39,7 @@ SUPPORT_HANDLE = "@s_simon_19"
 GOOGLE_SHEET_NAME = "Fitness Clients"
 CREDENTIALS_FILE = "credentials.json"
 
-# Conversation States
+# Conversation States (Primary Onboarding & Verification)
 (
     LANGUAGE,
     GENDER,
@@ -48,16 +48,20 @@ CREDENTIALS_FILE = "credentials.json"
     HEIGHT,
     WEIGHT,
     GOAL,
-    ACTIVITY,
-    EXPERIENCE,
-    OBSTACLE,
-    READINESS,
-    HEALTH_INJURIES,
-    DIET_RESTRICTIONS,
     PHONE,
     DURATION,
     RECEIPT,
-) = range(16)
+) = range(10)
+
+# Post-Approval Questionnaire States
+(
+    POST_ACTIVITY,
+    POST_EXPERIENCE,
+    POST_OBSTACLE,
+    POST_READINESS,
+    POST_HEALTH,
+    POST_DIET,
+) = range(10, 16)
 
 
 # ==========================================
@@ -354,22 +358,20 @@ async def location_choice(
   context.user_data["location_type"] = location_type
   lang = context.user_data.get("lang", "am")
 
-  # Send the requested teaser message before asking for age/height/weight
+  # Teaser line (200 clients part eliminated)
   if lang == "am":
     teaser_msg = (
-        "⏳ <b>በግምት በ3 ደቂቃ ውስጥ የእርስዎን ብጁ (Custom) ዕቅድ እናዘጋጃለን።</b>\n"
-        "ክብረወሰናችን፦ ከ2024 ጀምሮ ከ200 በላይ ሰዎችን ሰውነት ለውጠናል — አሁን የእርስዎ መሠረት"
-        " ይጀምራል!"
+        "⏳ <b>በግምት በ3 ደቂቃ ውስጥ የእርስዎን ብጁ (Custom) ዕቅድ እናዘጋጃለን —"
+        " እናስጀምር!</b>"
     )
   else:
     teaser_msg = (
-        "⏳ <b>In about 3 minutes I'll put together your custom plan.</b>\nOver"
-        " 200 clients transformed since 2024 — let's get started!"
+        "⏳ <b>In about 3 minutes I'll put together your custom plan — let's"
+        " get started!</b>"
     )
 
   await query.edit_message_text(teaser_msg, parse_mode="HTML")
 
-  # Prompt for age immediately after
   age_prompt = (
       "🎂 <b>ዕድሜዎ ስንት ነው?</b> (ምሳሌ፡ 25)"
       if lang == "am"
@@ -484,7 +486,7 @@ async def weight_input(
 
 
 # ==========================================
-# 🎯 STEP 5: GOAL & ACTIVITY LEVEL
+# 📞 STEP 5: GOAL & PHONE VERIFICATION
 # ==========================================
 async def goal_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
   query = update.callback_query
@@ -494,233 +496,15 @@ async def goal_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
   context.user_data["goal"] = goal
   lang = context.user_data.get("lang", "am")
 
-  keyboard = [
-      [
-          InlineKeyboardButton(
-              "🛋️ እንቅስቃሴ የሌለው (የተቀመጠ)"
-              if lang == "am"
-              else "🛋️ Sedentary (Office Job)",
-              callback_data="act_sedentary",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "🚶 መካከለኛ (በሳምንት 1-3 ቀን)"
-              if lang == "am"
-              else "🚶 Moderate (1-3 days/wk)",
-              callback_data="act_moderate",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "🏋️ ከፍተኛ (በሳምንት 4+ ቀን)"
-              if lang == "am"
-              else "🏋️ High Activity (4+ days/wk)",
-              callback_data="act_high",
-          )
-      ],
-  ]
-  reply_markup = InlineKeyboardMarkup(keyboard)
-
   text = (
-      "🏃 <b>ዕለታዊ እንቅስቃሴዎ ምን ይመስላል?</b>"
-      if lang == "am"
-      else "🏃 <b>What is your daily activity level?</b>"
-  )
-  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
-  return ACTIVITY
-
-
-# ==========================================
-# ⭐ STEP 6: HIGH-QUALIFYING QUESTIONS
-# ==========================================
-async def activity_choice(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-  query = update.callback_query
-  await query.answer()
-
-  activity = query.data.split("_")[1]
-  context.user_data["activity"] = activity
-  lang = context.user_data.get("lang", "am")
-
-  keyboard = [
-      [
-          InlineKeyboardButton(
-              "🟢 ገና ጀማሪ" if lang == "am" else "🟢 Beginner (New to gym)",
-              callback_data="exp_beginner",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "🟡 መካከለኛ"
-              if lang == "am"
-              else "🟡 Intermediate (Knows basics)",
-              callback_data="exp_intermediate",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "🔴 ልምድ ያለው"
-              if lang == "am"
-              else "🔴 Advanced (Stuck at plateau)",
-              callback_data="exp_advanced",
-          )
-      ],
-  ]
-  reply_markup = InlineKeyboardMarkup(keyboard)
-
-  text = (
-      "🏋️ <b>የስፖርት ወይም የጂም ልምድዎ ምን ይመስላል?</b>"
-      if lang == "am"
-      else "🏋️ <b>What is your training experience level?</b>"
-  )
-  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
-  return EXPERIENCE
-
-
-async def experience_choice(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-  query = update.callback_query
-  await query.answer()
-
-  exp = query.data.split("_")[1]
-  context.user_data["experience"] = exp
-  lang = context.user_data.get("lang", "am")
-
-  keyboard = [
-      [
-          InlineKeyboardButton(
-              "🍱 የምግብ ሥርዓት አለመጠበቅ"
-              if lang == "am"
-              else "🍱 Bad Diet & Nutrition",
-              callback_data="obs_diet",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "⏰ የጊዜ እጥረት" if lang == "am" else "⏰ Lack of Time",
-              callback_data="obs_time",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "📉 ወጥነት ማጣት" if lang == "am" else "📉 Lack of Consistency",
-              callback_data="obs_consistency",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "❓ ምን መሥራት እንዳለብኝ አለማወቅ"
-              if lang == "am"
-              else "❓ No Structured Plan",
-              callback_data="obs_plan",
-          )
-      ],
-  ]
-  reply_markup = InlineKeyboardMarkup(keyboard)
-
-  text = (
-      "🚧 <b>አሁን ላይ ለውጥ እንዳያመጡ ትልቁ ፈተናዎ ምንድን ነው?</b>"
-      if lang == "am"
-      else "🚧 <b>What is your biggest obstacle right now?</b>"
-  )
-  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
-  return OBSTACLE
-
-
-async def obstacle_choice(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-  query = update.callback_query
-  await query.answer()
-
-  obs = query.data.split("_")[1]
-  context.user_data["obstacle"] = obs
-  lang = context.user_data.get("lang", "am")
-
-  keyboard = [
-      [
-          InlineKeyboardButton(
-              "⚡ 10 - ዛሬውኑ ለመጀመር 100% ዝግጁ ነኝ!"
-              if lang == "am"
-              else "⚡ 10 - Ready to start today!",
-              callback_data="read_10",
-          )
-      ],
-      [
-          InlineKeyboardButton(
-              "📈 7-9 - ዝግጁ ነኝ፣ ትክክለኛ ፕሮግራም ብቻ ነው የሚያስፈልገኝ"
-              if lang == "am"
-              else "📈 7-9 - Ready with the right plan",
-              callback_data="read_7-9",
-          )
-      ],
-  ]
-  reply_markup = InlineKeyboardMarkup(keyboard)
-
-  text = (
-      "🔥 <b>ከ1-10 ባለው ደረጃ፣ ሰውነትዎን ለመለወጥ አሁን ምን ያህል ተዘጋጅተዋል?</b>"
-      if lang == "am"
-      else "🔥 <b>On a scale of 1–10, how ready are you to transform your body?</b>"
-  )
-  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
-  return READINESS
-
-
-# ==========================================
-# 🩺 STEP 7: HEALTH, DIET & PHONE COLLECTION
-# ==========================================
-async def readiness_choice(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-  query = update.callback_query
-  await query.answer()
-
-  readiness = query.data.split("_")[1]
-  context.user_data["readiness"] = readiness
-  lang = context.user_data.get("lang", "am")
-
-  text = (
-      "🩹 <b>ማንኛውም የሰውነት ጉዳት ወይም የጤና ሁኔታ አለብዎት?</b>\n<i>(ከሌለ 'የለም' ብለው"
-      " ይጻፉ)</i>"
-      if lang == "am"
-      else "🩹 <b>Do you have any injuries or medical conditions?</b>\n<i>(If"
-      " none, reply 'None')</i>"
-  )
-  await query.edit_message_text(text, parse_mode="HTML")
-  return HEALTH_INJURIES
-
-
-async def health_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-  lang = context.user_data.get("lang", "am")
-  context.user_data["injuries"] = update.message.text.strip()
-
-  text = (
-      "🥗 <b>ማንኛውም የማይስማማዎት ወይም የማይወዱት ምግብ አለ?</b>\n<i>(ከሌለ 'የለም' ብለው"
-      " ይጻፉ)</i>"
-      if lang == "am"
-      else "🥗 <b>Do you have any food allergies or severe dislikes?</b>\n<i>(If"
-      " none, reply 'None')</i>"
-  )
-  await update.message.reply_text(text, parse_mode="HTML")
-  return DIET_RESTRICTIONS
-
-
-async def diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-  lang = context.user_data.get("lang", "am")
-  context.user_data["diet"] = update.message.text.strip()
-
-  text = (
-      "📞 <b>ለቀጣይ ክትትል የሚሆን ስልክ ቁጥርዎ ስንት ነው?</b> (ምሳሌ፡ 0911223344)"
+      "📞 <b>ለማረጋገጫ እና ክትትል የሚሆን ስልክ ቁጥርዎ ስንት ነው?</b> (ምሳሌ፡ 0911223344)"
       if lang == "am"
       else (
-          "📞 <b>What is your phone number for follow-up?</b> (e.g.,"
-          " +251911223344 or 0911223344)"
+          "📞 <b>What is your phone number for verification &"
+          " follow-up?</b> (e.g., +251911223344 or 0911223344)"
       )
   )
-  await update.message.reply_text(text, parse_mode="HTML")
+  await query.edit_message_text(text, parse_mode="HTML")
   return PHONE
 
 
@@ -909,7 +693,7 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
 
 # ==========================================
-# ⏱️ STEP 8: DURATION & PRICING
+# ⏱️ STEP 6: DURATION & PAYMENT
 # ==========================================
 async def duration_choice(
     update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -997,7 +781,7 @@ async def duration_choice(
 
 
 # ==========================================
-# 📥 STEP 9: RECEIPT PROCESSING & GOOGLE SHEET SYNC
+# 📥 STEP 7: RECEIPT UPLOAD & WAITING FOR APPROVAL
 # ==========================================
 async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
   user = update.effective_user
@@ -1006,20 +790,15 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
   loc_type = context.user_data.get("location_type", "et")
 
   loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
-
-  # Generate exact registration timestamp with short month format (e.g. 2026-Aug-06 07:41:17)
   registration_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
 
-  # Save lead and timestamp directly to Google Sheet
-  save_lead_to_google_sheet(context.user_data, user)
-
   admin_card = (
-      f"📥 <b>NEW PAID INTAKE RECEIVED!</b>\n"
+      f"📥 <b>NEW PAYMENT RECEIPT UPLOADED!</b>\n"
       f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
       f"👤 <b>Client:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
       f"📞 <b>Phone:</b> {context.user_data.get('phone')}\n"
       f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
-      f"📅 <b>Registered At:</b> {registration_timestamp}\n"
+      f"📅 <b>Uploaded At:</b> {registration_timestamp}\n"
       f"🌐 <b>Language:</b> {'Amharic' if lang == 'am' else 'English'}\n"
       f"📍 <b>Location:</b> {loc}\n"
       f"⏱️ <b>Program:</b> {context.user_data.get('duration')}"
@@ -1029,15 +808,7 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
       f" {context.user_data.get('age')} yrs\n"
       f"• <b>Height:</b> {context.user_data.get('height')} cm |"
       f" <b>Weight:</b> {context.user_data.get('weight')} kg\n"
-      f"• <b>Goal:</b> {context.user_data.get('goal')} | <b>Activity:</b>"
-      f" {context.user_data.get('activity')}\n\n"
-      f"⭐ <b>Qualification Profile:</b>\n"
-      f"• <b>Experience:</b> {context.user_data.get('experience')}\n"
-      f"• <b>Obstacle:</b> {context.user_data.get('obstacle')}\n"
-      f"• <b>Readiness Score:</b> {context.user_data.get('readiness')}/10\n\n"
-      f"🩺 <b>Health & Preferences:</b>\n"
-      f"• <b>Injuries:</b> {context.user_data.get('injuries')}\n"
-      f"• <b>Diet Dislikes:</b> {context.user_data.get('diet')}"
+      f"• <b>Goal:</b> {context.user_data.get('goal')}"
   )
 
   admin_keyboard = [
@@ -1065,25 +836,277 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
       logging.error(f"Failed to send receipt to admin {admin_id}: {e}")
 
   if lang == "am":
+    wait_msg = (
+        "⏳ <b>የክፍያ ደረሰኝዎ ደርሶናል!</b>\n\nሳይመን ክፍያዎን እስኪያረጋግጥ እባክዎ ትንሽ"
+        " ይጠብቁ። ክፍያው እንደጸደቀ ቀጣዮቹን አጫጭር ጥያቄዎች እንቀጥላለን!"
+    )
+  else:
+    wait_msg = (
+        "⏳ <b>Receipt received!</b>\n\nPlease wait while Simon verifies your"
+        " payment. Once approved, we will continue with your remaining quick"
+        " questions!"
+    )
+
+  await update.message.reply_text(wait_msg, parse_mode="HTML")
+  return ConversationHandler.END
+
+
+# ==========================================
+# 🚀 POST-APPROVAL RESUME CALLBACK & QUESTIONS
+# ==========================================
+async def resume_assessment(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+  lang = context.user_data.get("lang", "am")
+
+  if lang == "am":
+    text = "🏃 <b>ዕለታዊ እንቅስቃሴዎ ምን ይመስላል?</b>"
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🛋️ እንቅስቃሴ የሌለው (የተቀመጠ)", callback_data="pact_sedentary"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🚶 መካከለኛ (በሳምንት 1-3 ቀን)", callback_data="pact_moderate"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🏋️ ከፍተኛ (በሳምንት 4+ ቀን)", callback_data="pact_high"
+            )
+        ],
+    ]
+  else:
+    text = "🏃 <b>What is your daily activity level?</b>"
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "🛋️ Sedentary (Office Job)", callback_data="pact_sedentary"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🚶 Moderate (1-3 days/wk)", callback_data="pact_moderate"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🏋️ High Activity (4+ days/wk)", callback_data="pact_high"
+            )
+        ],
+    ]
+
+  reply_markup = InlineKeyboardMarkup(keyboard)
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+  return POST_ACTIVITY
+
+
+async def post_activity_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+
+  activity = query.data.split("_")[1]
+  context.user_data["activity"] = activity
+  lang = context.user_data.get("lang", "am")
+
+  keyboard = [
+      [
+          InlineKeyboardButton(
+              "🟢 ገና ጀማሪ" if lang == "am" else "🟢 Beginner (New to gym)",
+              callback_data="pexp_beginner",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "🟡 መካከለኛ"
+              if lang == "am"
+              else "🟡 Intermediate (Knows basics)",
+              callback_data="pexp_intermediate",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "🔴 ልምድ ያለው"
+              if lang == "am"
+              else "🔴 Advanced (Stuck at plateau)",
+              callback_data="pexp_advanced",
+          )
+      ],
+  ]
+  reply_markup = InlineKeyboardMarkup(keyboard)
+
+  text = (
+      "🏋️ <b>የስፖርት ወይም የጂም ልምድዎ ምን ይመስላል?</b>"
+      if lang == "am"
+      else "🏋️ <b>What is your training experience level?</b>"
+  )
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+  return POST_EXPERIENCE
+
+
+async def post_experience_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+
+  exp = query.data.split("_")[1]
+  context.user_data["experience"] = exp
+  lang = context.user_data.get("lang", "am")
+
+  keyboard = [
+      [
+          InlineKeyboardButton(
+              "🍱 የምግብ ሥርዓት አለመጠበቅ"
+              if lang == "am"
+              else "🍱 Bad Diet & Nutrition",
+              callback_data="pobs_diet",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "⏰ የጊዜ እጥረት" if lang == "am" else "⏰ Lack of Time",
+              callback_data="pobs_time",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "📉 ወጥነት ማጣት" if lang == "am" else "📉 Lack of Consistency",
+              callback_data="pobs_consistency",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "❓ ምን መሥራት እንዳለብኝ አለማወቅ"
+              if lang == "am"
+              else "❓ No Structured Plan",
+              callback_data="pobs_plan",
+          )
+      ],
+  ]
+  reply_markup = InlineKeyboardMarkup(keyboard)
+
+  text = (
+      "🚧 <b>አሁን ላይ ለውጥ እንዳያመጡ ትልቁ ፈተናዎ ምንድን ነው?</b>"
+      if lang == "am"
+      else "🚧 <b>What is your biggest obstacle right now?</b>"
+  )
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+  return POST_OBSTACLE
+
+
+async def post_obstacle_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+
+  obs = query.data.split("_")[1]
+  context.user_data["obstacle"] = obs
+  lang = context.user_data.get("lang", "am")
+
+  keyboard = [
+      [
+          InlineKeyboardButton(
+              "⚡ 10 - ዛሬውኑ ለመጀመር 100% ዝግጁ ነኝ!"
+              if lang == "am"
+              else "⚡ 10 - Ready to start today!",
+              callback_data="pread_10",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "📈 7-9 - ዝግጁ ነኝ፣ ትክክለኛ ፕሮግራም ብቻ ነው የሚያስፈልገኝ"
+              if lang == "am"
+              else "📈 7-9 - Ready with the right plan",
+              callback_data="pread_7-9",
+          )
+      ],
+  ]
+  reply_markup = InlineKeyboardMarkup(keyboard)
+
+  text = (
+      "🔥 <b>ከ1-10 ባለው ደረጃ፣ ሰውነትዎን ለመለወጥ አሁን ምን ያህል ተዘጋጅተዋል?</b>"
+      if lang == "am"
+      else "🔥 <b>On a scale of 1–10, how ready are you to transform your body?</b>"
+  )
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+  return POST_READINESS
+
+
+async def post_readiness_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+
+  readiness = query.data.split("_")[1]
+  context.user_data["readiness"] = readiness
+  lang = context.user_data.get("lang", "am")
+
+  text = (
+      "🩹 <b>ማንኛውም የሰውነት ጉዳት ወይም የጤና ሁኔታ አለብዎት?</b>\n<i>(ከሌለ 'የለም' ብለው"
+      " ይጻፉ)</i>"
+      if lang == "am"
+      else "🩹 <b>Do you have any injuries or medical conditions?</b>\n<i>(If"
+      " none, reply 'None')</i>"
+  )
+  await query.edit_message_text(text, parse_mode="HTML")
+  return POST_HEALTH
+
+
+async def post_health_input(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  lang = context.user_data.get("lang", "am")
+  context.user_data["injuries"] = update.message.text.strip()
+
+  text = (
+      "🥗 <b>ማንኛውም የማይስማማዎት ወይም የማይወዱት ምግብ አለ?</b>\n<i>(ከሌለ 'የለም' ብለው"
+      " ይጻፉ)</i>"
+      if lang == "am"
+      else "🥗 <b>Do you have any food allergies or severe dislikes?</b>\n<i>(If"
+      " none, reply 'None')</i>"
+  )
+  await update.message.reply_text(text, parse_mode="HTML")
+  return POST_DIET
+
+
+async def post_diet_input(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  user = update.effective_user
+  lang = context.user_data.get("lang", "am")
+  context.user_data["diet"] = update.message.text.strip()
+
+  # Save full client data and timestamp to Google Sheet now that questionnaire is complete after approval
+  save_lead_to_google_sheet(context.user_data, user)
+
+  if lang == "am":
     confirm_msg = (
-        "🎉 <b>ደስ ብሎናል! የክፍያ ደረሰኝዎ በሰላም ደርሶናል!</b>\n\n"
+        "🎉 <b>እንኳን ደስ አለዎት! መረጃዎ ሙሉ በሙሉ ተመዝግቧል!</b>\n\n"
         "📋 <b>ቀጣይ እርምጃችን ምን ይሆናል?</b>\n"
-        "• ሳይመን ያስገቡትን መረጃ እና ደረሰኝ አሁን እየገመገመ ይገኛል።\n"
-        "• እርስዎ ይህንን ታላቅ መንገድ ጀምረዋል፤ አብረን አስደናቂ ለውጥ እናመጣለን እንዲሁም ግቦችዎን እንዲመቱ"
-        " እግዝዎታለሁ! የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b>"
-        " እዚሁ ቻት ላይ ይላክልዎታል።\n\n"
-        "💪 <i>ወደ አዲሱ እና ጠንካራው ማንነትዎ ለሚያደርጉት ጉዞ እንኳን ደስ አለዎት!</i>"
+        "• ሳይመን ያስገቡትን ሙሉ መረጃ በመጠቀም ብጁ (Custom) ዕቅድዎን አሁን ማዘጋጀት"
+        " ጀምሯል።\n"
+        "• የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b> እዚሁ ቻት"
+        " ላይ ይላክልዎታል።\n\n"
+        "💪 <i>አብረን አስደናቂ ለውጥ እናመጣለን!</i>"
     )
   else:
     confirm_msg = (
-        "🎉 <b>Receipt Successfully Received!</b>\n\n"
+        "🎉 <b>Assessment Successfully Completed!</b>\n\n"
         "📋 <b>Next Steps:</b>\n"
-        "• Simon is currently reviewing your assessment data and receipt.\n"
-        "• You are starting this great path, and we are going to create your"
-        " amazing transformation together to help you achieve your goals! You"
-        " will receive your fully customized plan <b>within 24 hours</b>"
-        " directly in this chat.\n\n"
-        "💪 <i>Welcome aboard, let's build something amazing together!</i>"
+        "• Simon is now building your fully customized training and nutrition"
+        " plan based on your full assessment.\n"
+        "• You will receive your complete plan <b>within 24 hours</b> directly"
+        " in this chat.\n\n"
+        "💪 <i>Let's build something amazing together!</i>"
     )
 
   await update.message.reply_text(confirm_msg, parse_mode="HTML")
@@ -1104,10 +1127,14 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     await context.bot.send_message(
         chat_id=client_id,
         text=(
-            "✅ <b>Payment Approved!</b> Simon has verified your receipt. You"
-            " are starting this incredible path, and we're going to build your"
-            " amazing transformation together! Expect your custom plan shortly."
+            "✅ <b>Payment Approved by Simon!</b> Click below to finish your"
+            " remaining quick questions so we can build your custom plan:"
         ),
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton(
+                "🚀 Continue Assessment", callback_data="resume_assessment"
+            )
+        ]]),
         parse_mode="HTML",
     )
     await query.edit_message_caption(
@@ -1119,7 +1146,7 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
         chat_id=client_id,
         text=(
             "❌ <b>Payment Alert:</b> We could not verify your receipt"
-            " screenshot. Please contact Simon directly to double-check."
+            f" screenshot. Please contact Simon directly at {SUPPORT_HANDLE}."
         ),
         parse_mode="HTML",
     )
@@ -1140,7 +1167,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 def main():
   threading.Thread(target=run_web_server, daemon=True).start()
 
-  # Enable persistence so users never lose their progress if they drop off halfway
+  # Enable persistence so users never lose their progress
   persistence = PicklePersistence(filepath="bot_persistence")
 
   app = (
@@ -1154,6 +1181,7 @@ def main():
   app.add_handler(CommandHandler("faq", faq_command))
   app.add_handler(CallbackQueryHandler(faq_callback, pattern="^faq_"))
 
+  # Primary Onboarding Conversation Handler (Stops at RECEIPT upload awaiting admin approval)
   conv_handler = ConversationHandler(
       entry_points=[CommandHandler("start", start)],
       states={
@@ -1168,18 +1196,6 @@ def main():
               MessageHandler(filters.TEXT & ~filters.COMMAND, weight_input)
           ],
           GOAL: [CallbackQueryHandler(goal_choice, pattern="^goal_")],
-          ACTIVITY: [CallbackQueryHandler(activity_choice, pattern="^act_")],
-          EXPERIENCE: [
-              CallbackQueryHandler(experience_choice, pattern="^exp_")
-          ],
-          OBSTACLE: [CallbackQueryHandler(obstacle_choice, pattern="^obs_")],
-          READINESS: [CallbackQueryHandler(readiness_choice, pattern="^read_")],
-          HEALTH_INJURIES: [
-              MessageHandler(filters.TEXT & ~filters.COMMAND, health_input)
-          ],
-          DIET_RESTRICTIONS: [
-              MessageHandler(filters.TEXT & ~filters.COMMAND, diet_input)
-          ],
           PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_input)],
           DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
           RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
@@ -1189,12 +1205,43 @@ def main():
       persistent=True,
   )
 
+  # Post-Approval Questionnaire Conversation Handler (Triggered after admin clicks Confirm)
+  post_conv_handler = ConversationHandler(
+      entry_points=[
+          CallbackQueryHandler(resume_assessment, pattern="^resume_assessment$")
+      ],
+      states={
+          POST_ACTIVITY: [
+              CallbackQueryHandler(post_activity_choice, pattern="^pact_")
+          ],
+          POST_EXPERIENCE: [
+              CallbackQueryHandler(post_experience_choice, pattern="^pexp_")
+          ],
+          POST_OBSTACLE: [
+              CallbackQueryHandler(post_obstacle_choice, pattern="^pobs_")
+          ],
+          POST_READINESS: [
+              CallbackQueryHandler(post_readiness_choice, pattern="^pread_")
+          ],
+          POST_HEALTH: [
+              MessageHandler(filters.TEXT & ~filters.COMMAND, post_health_input)
+          ],
+          POST_DIET: [
+              MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)
+          ],
+      },
+      fallbacks=[CommandHandler("cancel", cancel)],
+      name="post_payment_conversation",
+      persistent=True,
+  )
+
   app.add_handler(conv_handler)
+  app.add_handler(post_conv_handler)
   app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
 
   print(
-      "⚡ Simon Telegram Bot with Persistence, Google Sheets, & Teaser Lines is"
-      " live..."
+      "⚡ Simon Telegram Bot with Phone Verification, Approval Gate, & Google"
+      " Sheets is live..."
   )
   app.run_polling()
 
