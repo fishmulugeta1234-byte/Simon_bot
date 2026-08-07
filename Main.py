@@ -1,5 +1,8 @@
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+import asyncio
+import os
+import tempfile
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ChatAction
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -9,6 +12,15 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+
+# Optional ReportLab import for PDF generation
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    HAS_REPORTLAB = True
+except ImportError:
+    HAS_REPORTLAB = False
 
 # Enable logging
 logging.basicConfig(
@@ -20,19 +32,103 @@ logger = logging.getLogger(__name__)
 TOKEN = "8765027788:AAEvkGMDXd8i3EdtqVYgdrnEA4j4Lbdxk4U"
 ADMIN_CHAT_IDS = [1622298145, 389487101]
 
-# In-memory storage for client onboarding progress
-CLIENT_STATES = {}
-
-# Conversation States (for initial onboarding steps)
+# Conversation States
 LANGUAGE, REGION, GOAL, PACKAGE, PHONE = range(5)
+
+# Helper Functions
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_CHAT_IDS
+
+def t(lang: str, en: any, am: any) -> any:
+    """Returns Amharic if language is Amharic, otherwise English."""
+    if lang in ["lang_am", "am"]:
+        return am
+    return en
+
+async def update_all_admin_copies(context: ContextTypes.DEFAULT_TYPE, admin_messages: list, base_caption: str, status_text: str):
+    """Updates the caption across all admin notification copies simultaneously."""
+    updated_caption = f"{base_caption}\n\n--------------------\n{status_text}"
+    for msg_info in admin_messages:
+        try:
+            await context.bot.edit_message_caption(
+                chat_id=msg_info["chat_id"],
+                message_id=msg_info["message_id"],
+                caption=updated_caption,
+                reply_markup=None,
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error("Failed to update admin message copy: %s", e)
+
+def generate_meal_plan_text(record: dict) -> str:
+    """Generates customized meal and macro structure based on user goal and stats."""
+    goal = record.get("goal", "")
+    weight = record.get("weight", "75")
+    height = record.get("height", "175")
+    
+    goal_title = "Fat Loss & Core Definition" if "fat_loss" in goal else "Muscle Building & Hypertrophy"
+    
+    return (
+        f"CLIENT PROFILE:\n"
+        f"• Goal: {goal_title}\n"
+        f"• Current Weight: {weight} kg\n"
+        f"• Height: {height} cm\n\n"
+        f"DAILY MACRO TARGETS:\n"
+        f"• Protein: 160g - 180g\n"
+        f"• Carbohydrates: 200g - 230g\n"
+        f"• Healthy Fats: 55g - 65g\n\n"
+        f"SAMPLE DAILY NUTRITION SCHEDULE:\n"
+        f"1. Breakfast: Oatmeal with eggs, banana, and black coffee.\n"
+        f"2. Lunch: Grilled chicken breast, white rice, and steamed vegetables.\n"
+        f"3. Snack: Greek yogurt with honey or almonds.\n"
+        f"4. Dinner: Lean beef or fish with sweet potatoes and salad."
+    )
+
+def build_meal_plan_pdf(record: dict, plan_text: str, username: str) -> str:
+    """Builds a professional PDF meal plan and returns file path."""
+    fd, pdf_path = tempfile.mkstemp(suffix=".pdf")
+    os.close(fd)
+
+    if HAS_REPORTLAB:
+        doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+
+        title_style = ParagraphStyle(
+            'TitleStyle',
+            parent=styles['Heading1'],
+            fontSize=22,
+            spaceAfter=15,
+            textColorHex='#1A365D'
+        )
+        body_style = ParagraphStyle(
+            'BodyStyle',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=16,
+            spaceAfter=10
+        )
+
+        story.append(Paragraph("Simon Origin — 1-on-1 Personalized Plan", title_style))
+        story.append(Paragraph(f"Prepared for: <b>{username}</b> ({record.get('duration', 'Custom Program')})", body_style))
+        story.append(Spacer(1, 10))
+
+        for line in plan_text.split("\n"):
+            if line.strip():
+                story.append(Paragraph(line.replace("\n", "<br/>"), body_style))
+            else:
+                story.append(Spacer(1, 6))
+
+        doc.build(story)
+    else:
+        with open(pdf_path, "w", encoding="utf-8") as f:
+            f.write(f"SIMON ORIGIN MEAL PLAN FOR {username}\n\n" + plan_text)
+
+    return pdf_path
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation and asks for language preference."""
-    user = update.effective_user
-    if user.id in CLIENT_STATES:
-        del CLIENT_STATES[user.id]
-
     keyboard = [
         [
             InlineKeyboardButton("🇺🇸 English", callback_data="lang_en"),
@@ -54,42 +150,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays detailed program tiers and investment guide FAQ for all clients."""
+    """Displays detailed program tiers and investment guide FAQ."""
     faq_text = (
         "📌 **Simon Origin — Program Tiers & Investment Guide**\n\n"
-        "🥗 **Meal Plan Only**\n"
-        "• **Investment:** 799 ETB\n"
-        "• **Focus:** Customized standalone nutrition and macro guidance.\n\n"
-        "🥉 **Kickstart (21 Days)**\n"
-        "• **Investment:** 3,500 ETB\n"
-        "• **Best for:** Beginners building momentum.\n"
-        "• **Includes:** Fixed workout plan, 1 meal plan, 1 total adjustment, weekly check-ins (3 total), and basic progress tracking.\n\n"
-        "🥈 **Transformation (60 Days)**\n"
-        "• **Investment:** 7,000 ETB / $110 USD\n"
-        "• **Best for:** Fat loss and muscle-building with consistent coaching.\n"
-        "• **Includes:** Workouts updated every 4 weeks, adjusted meal plan, check-ins every 4 weeks, up to 5 form reviews/month, and basic habit coaching.\n\n"
-        "🥇 **Elite (90 Days)**\n"
-        "• **Investment:** 9,500 ETB\n"
-        "• **Best for:** Serious long-term results.\n"
-        "• **Includes:** Fully custom workouts, unlimited meal plan adjustments, weekly check-ins (~13), anytime exercise form reviews, bi-weekly progress reviews, and 24-hr priority support.\n\n"
-        "💎 **Lifestyle (6 Months)**\n"
-        "• **Investment:** 18,000 ETB\n"
-        "• **Best for:** Permanent lifestyle change.\n"
-        "• **Includes:** New workout phase monthly, continuous meal plans, unlimited progress reviews, long-term habit coaching, monthly goal-setting sessions, and plateau-solving strategies.\n\n"
-        "👑 **VIP (6 Months)**\n"
-        "• **Investment:** 30,000 ETB\n"
-        "• **Best for:** Highest level of 1-on-1 support.\n"
-        "• **Includes:** Live-adjusted workouts, on-demand meal plans, weekly 30-45 min video calls, unlimited form reviews, travel/restaurant nutrition guidance, direct accountability outreach, and same-day priority support.\n\n"
-        "💡 **Ready to begin?** Send `/start` to launch the onboarding portal!"
+        "🥗 **Meal Plan Only** — 799 ETB\n"
+        "🥉 **Kickstart (21 Days)** — 3,500 ETB\n"
+        "🥈 **Transformation (60 Days)** — 7,000 ETB / $110 USD\n"
+        "🥇 **Elite (90 Days)** — 9,500 ETB\n"
+        "💎 **Lifestyle (6 Months)** — 18,000 ETB\n"
+        "👑 **VIP (6 Months)** — 30,000 ETB\n\n"
+        "💡 Send `/start` to launch the onboarding portal!"
     )
     await update.message.reply_text(faq_text, parse_mode="Markdown")
 
 
 async def region_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles language selection and asks for region."""
     query = update.callback_query
     await query.answer()
-    context.user_data["language"] = query.data
+    context.user_data["lang"] = query.data
 
     keyboard = [
         [InlineKeyboardButton("🇪🇹 ኢትዮጵያ (Ethiopia)", callback_data="reg_eth")],
@@ -98,146 +176,107 @@ async def region_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         [InlineKeyboardButton("🌐 Other Regions", callback_data="reg_other")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text(
-        text="📍 እባክዎ የሚኖሩበትን ሀገር/ክልል ይምረጡ (Select your region):",
-        reply_markup=reply_markup,
-    )
+    await query.edit_message_text(text="📍 እባክዎ የሚኖሩበትን ሀገር/ክልል ይምረጡ:", reply_markup=reply_markup)
     return REGION
 
 
 async def goal_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles region selection and asks for fitness goal."""
     query = update.callback_query
     await query.answer()
     context.user_data["region"] = query.data
 
     keyboard = [
-        [
-            InlineKeyboardButton(
-                "🔥 ስብ መቀነስ / ቦርጭ ማጥፋት", callback_data="goal_fat_loss"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "💪 የሰውነት ጡንቻ መገንባት", callback_data="goal_muscle"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "⚡ የጉልበት እና ብቃት ማሳደግ", callback_data="goal_performance"
-            )
-        ],
+        [InlineKeyboardButton("🔥 ስብ መቀነስ / ቦርጭ ማጥፋት", callback_data="goal_fat_loss")],
+        [InlineKeyboardButton("💪 የሰውነት ጡንቻ መገንባት", callback_data="goal_muscle")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    await query.edit_message_text(
-        text="🎯 ዋናው የፊትነስ ዓላማዎ ምንድን ነው?", reply_markup=reply_markup
-    )
+    await query.edit_message_text(text="🎯 ዋናው የፊትነስ ዓላማዎ ምንድን ነው?", reply_markup=reply_markup)
     return GOAL
 
 
 async def package_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles goal selection and shows full pricing tiers for all regions."""
     query = update.callback_query
     await query.answer()
     context.user_data["goal"] = query.data
 
     keyboard = [
-        [
-            InlineKeyboardButton(
-                "🥗 የምግብ እቅድ ብቻ — 799 ETB", callback_data="pkg_meal"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥉 Kickstart (21-ቀን) — 3,500 ETB", callback_data="pkg_21"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥈 Transformation (60-ቀን) — 7,000 ETB ($110 USD)",
-                callback_data="pkg_60",
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🥇 Elite (90-ቀን) — 9,500 ETB", callback_data="pkg_90"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "💎 Lifestyle (6-ወር) — 18,000 ETB", callback_data="pkg_180"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "👑 VIP (6-ወር) — 30,000 ETB", callback_data="pkg_vip"
-            )
-        ],
+        [InlineKeyboardButton("🥗 የምግብ እቅድ ብቻ — 799 ETB", callback_data="pkg_meal")],
+        [InlineKeyboardButton("🥉 Kickstart (21-ቀን) — 3,500 ETB", callback_data="pkg_21")],
+        [InlineKeyboardButton("🥈 Transformation (60-ቀን) — 7,000 ETB", callback_data="pkg_60")],
+        [InlineKeyboardButton("🥇 Elite (90-ቀን) — 9,500 ETB", callback_data="pkg_90")],
     ]
-
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.edit_message_text(
-        text="⏱️ ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦",
-        reply_markup=reply_markup,
-    )
+    await query.edit_message_text(text="⏱️ የፕሮግራም ቆይታ ይምረጡ፦", reply_markup=reply_markup)
     return PACKAGE
 
 
 async def phone_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Handles package selection and asks for phone number."""
     query = update.callback_query
     await query.answer()
-    context.user_data["package"] = query.data
+    context.user_data["duration"] = query.data
 
     await query.edit_message_text(
         text="📞 ለክፍያ ማረጋገጫ እና ለክትትል የሚሆን ስልክ ቁጥርዎ ስንት ነው? (ምሳሌ፡ 0911223344)\n\n"
-             "*(በማንኛውም ጊዜ ' /cancel ' በመጻፍ ማቋረጥ ይችላሉ)*"
+             "*(በማንኛውም ጊዜ /cancel በመጻፍ ማቋረጥ ይችላሉ)*"
     )
     return PHONE
 
 
-async def payment_instructions(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> int:
-    """Receives phone number, displays payment details, and stores in memory."""
-    user = update.effective_user
-    phone = update.message.text
-    region = context.user_data.get("region")
-    goal = context.user_data.get("goal")
-    pkg = context.user_data.get("package")
-
-    CLIENT_STATES[user.id] = {
-        "region": region,
-        "goal": goal,
-        "package": pkg,
-        "phone": phone,
-        "step": "waiting_receipt",
-    }
+async def payment_instructions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["phone"] = update.message.text
+    lang = context.user_data.get("lang", "en")
+    region = context.user_data.get("region", "reg_eth")
 
     if region == "reg_eth":
-        pay_text = (
-            "💳 **የክፍያ መመሪያ (ለሀገር ውስጥ)**\n\n"
-            f"⏱️ **የተመረጠው ፕሮግራም፦** {pkg}\n"
-            "💰 **ክፍያ መጠን፦** እንደመረጡት ፓኬጅ\n\n"
-            "እባክዎ ክፍያውን በሚከተሉት የባንክ ሂሳቦች ያስገቡ፦\n"
-            "• **CBE Bank:** `1000357796532`\n"
-            "• **Telebirr:** `0939998090`\n"
-            "• **ስም:** Simon mulugeta\n\n"
-            "📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን **ግልጽ ስክሪንሽኦት ወይም ፎቶ** እዚህ ይላኩ።"
+        pay_text = t(
+            lang,
+            (
+                "💳 **Payment Instructions (Ethiopia)**\n\n"
+                "📲 **How to Send:**\n"
+                "1. Open your **CBE Birr** or **Telebirr** mobile app.\n"
+                "2. Select **Transfer / Send Money**.\n"
+                "3. Send to one of the accounts below:\n"
+                "• **CBE Account:** `1000357796532`\n"
+                "• **Telebirr Number:** `0939998090`\n"
+                "• **Account Name:** Simon Mulugeta\n\n"
+                "📸 Once transferred, take a screenshot of your success receipt and send it right here in this chat."
+            ),
+            (
+                "💳 **የክፍያ መመሪያ (ለሀገር ውስጥ)**\n\n"
+                "📲 **ክፍያውን እንዴት መላክ ይችላሉ?**\n"
+                "1. የ **ሲቢኢ ብር (CBE Birr)** ወይም **ቴሌብር (Telebirr)** መተግበሪያዎን ይክፈቱ።\n"
+                "2. ገንዘብ ለመላክ (Transfer) የሚለውን ይምረጡ።\n"
+                "3. ከዚህ በታች ባሉት መለያዎች ያስገቡ፦\n"
+                "• **የባንክ ሂሳብ (CBE):** `1000357796532`\n"
+                "• **ቴሌብር (Telebirr):** `0939998090`\n"
+                "• **ስም:** Simon Mulugeta\n\n"
+                "📸 ክፍያውን እንደፈጸሙ፣ የደረሰኙን ግልጽ ስክሪንሽኦት ወይም ፎቶ እዚህ ቻት ላይ ይላኩ።"
+            )
         )
     else:
-        pay_text = (
-            "💳 **Payment Instructions (USA, Canada, Europe & Other)**\n\n"
-            f"⏱️ **Selected Program:** {pkg}\n"
-            "💰 **Total Fee:** Based on selected package ($110 USD for Transformation)\n\n"
-            "📲 **How to Pay:**\n"
-            "You can easily send payments using **Remitly** or your preferred remittance app:\n"
-            "• **CBE Account:** `1000357796532`\n"
-            "• **Telebirr (International):** `0939998090`\n"
-            "• **Account Name:** Simon Mulugeta\n\n"
-            "📸 Once completed, please send a **clear screenshot or photo** of your transfer receipt below."
+        pay_text = t(
+            lang,
+            (
+                "💳 **Payment Instructions (International)**\n\n"
+                "📲 **How to Send:**\n"
+                "1. Open an international remittance app like **Remitly** or **Wise**.\n"
+                "2. Choose Ethiopia as the destination country and select mobile wallet or bank deposit.\n"
+                "3. Enter the details below:\n"
+                "• **CBE Account:** `1000357796532`\n"
+                "• **Telebirr:** `0939998090`\n"
+                "• **Account Name:** Simon Mulugeta\n\n"
+                "📸 Once completed, send a clear screenshot of your transfer receipt here."
+            ),
+            (
+                "💳 **የክፍያ መመሪያ (ከሀገር ውጪ ላሉ)**\n\n"
+                "📲 **ክፍያውን እንዴት መላክ ይችላሉ?**\n"
+                "1. እንደ **Remitly** ወይም **Wise** ያሉ አለም አቀፍ መተግበሪያዎችን ይጠቀሙ።\n"
+                "2. መድረሻውን ኢትዮጵያ በማድረግ ከታች ያሉትን መረጃዎች ያስገቡ፦\n"
+                "• **የባንክ ሂሳብ (CBE):** `1000357796532`\n"
+                "• **ቴሌብር (Telebirr):** `0939998090`\n"
+                "• **ስም:** Simon Mulugeta\n\n"
+                "📸 ክፍያውን ከፈጸሙ በኋላ የደረሰኙን ስክሪንሽኦት እዚህ ይላኩ።"
+            )
         )
 
     await update.message.reply_text(pay_text, parse_mode="Markdown")
@@ -245,219 +284,194 @@ async def payment_instructions(
 
 
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Receives receipt photo from client and sends approval buttons to admins."""
     user = update.effective_user
-    state = CLIENT_STATES.get(user.id)
-
-    if not state or state.get("step") != "waiting_receipt":
+    chat_id = update.effective_chat.id
+    
+    if "region" not in context.user_data:
         return
 
     photo_file = await update.message.photo[-1].get_file()
-    state["receipt_file_id"] = photo_file.file_id
-    state["step"] = "waiting_approval"
-
+    
+    lang = context.user_data.get("lang", "en")
     await update.message.reply_text(
-        "📸 **የክፍያ ደረሰኝዎ ደርሷል!**\n\nሳይመን ክፍያዎን እስኪያረጋግጥ እባክዎ ትንሽ ይጠብቁ...",
-        parse_mode="Markdown"
+        t(lang, "📸 Receipt received! Please wait while Simon verifies your payment...",
+                "📸 የክፍያ ደረሰኝዎ ደርሷል! ሳይመን እስኪያረጋግጥ ይጠብቁ...")
     )
 
-    admin_text = (
+    admin_caption = (
         "🚀 **New Payment Receipt Verification!**\n\n"
         f"👤 **Name:** {user.full_name} (@{user.username or 'No username'})\n"
         f"🆔 **User ID:** `{user.id}`\n"
-        f"🌍 **Region:** {state.get('region')}\n"
-        f"🎯 **Goal:** {state.get('goal')}\n"
-        f"📞 **Phone:** {state.get('phone')}\n"
-        f"⏱️ **Program:** {state.get('package')}\n\n"
-        "👇 **Please review the receipt and select an action:**"
+        f"🌍 **Region:** {context.user_data.get('region')}\n"
+        f"🎯 **Goal:** {context.user_data.get('goal')}\n"
+        f"📞 **Phone:** {context.user_data.get('phone')}\n"
+        f"⏱️ **Duration:** {context.user_data.get('duration')}\n\n"
+        "👇 **Action Required:**"
     )
 
     keyboard = [
         [
-            InlineKeyboardButton("✅ Accept Payment", callback_data=f"accept_{user.id}"),
+            InlineKeyboardButton("✅ Confirm & Build Plan", callback_data=f"confirm_{user.id}"),
             InlineKeyboardButton("❌ Reject Payment", callback_data=f"reject_{user.id}"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    admin_messages = []
     for admin_id in ADMIN_CHAT_IDS:
         try:
-            await context.bot.send_photo(
+            msg = await context.bot.send_photo(
                 chat_id=admin_id,
                 photo=photo_file.file_id,
-                caption=admin_text,
+                caption=admin_caption,
                 reply_markup=reply_markup,
                 parse_mode="Markdown"
             )
+            admin_messages.append({"chat_id": admin_id, "message_id": msg.message_id})
         except Exception as e:
-            logger.error(f"Failed to send payment verification to admin {admin_id}: {e}")
+            logger.error(f"Failed to notify admin {admin_id}: {e}")
+
+    if "pending" not in context.bot_data:
+        context.bot_data["pending"] = {}
+
+    context.bot_data["pending"][user.id] = {
+        "chat_id": chat_id,
+        "username": user.full_name,
+        "lang": lang,
+        "region": context.user_data.get("region"),
+        "goal": context.user_data.get("goal"),
+        "duration": context.user_data.get("duration"),
+        "weight": "75",
+        "height": "175",
+        "admin_messages": admin_messages,
+        "admin_caption": admin_caption
+    }
 
 
-async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles admin clicks on Accept or Reject buttons."""
+async def admin_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    if not is_admin(query.from_user.id):
+        await query.answer("Not authorized.", show_alert=True)
+        return
     await query.answer()
 
-    data = query.data
-    if data.startswith("accept_") or data.startswith("reject_"):
-        action, user_id_str = data.split("_")
-        client_id = int(user_id_str)
-        state = CLIENT_STATES.get(client_id)
-
-        if not state:
+    user_id = int(query.data.replace("confirm_", ""))
+    record = context.bot_data.get("pending", {}).pop(user_id, None)
+    if not record:
+        try:
             await query.edit_message_caption(
-                caption=(query.message.caption or "") + "\n\n⚠️ *Session expired or client data not found.*",
-                parse_mode="Markdown"
+                caption=(query.message.caption or "") + "\n\n⚠️ Already handled by another admin.",
+                reply_markup=None
             )
-            return
-
-        if action == "accept":
-            state["step"] = "weight"
-            await query.edit_message_caption(
-                caption=(query.message.caption or "").replace(
-                    "👇 **Please review the receipt and select an action:**",
-                    "✅ **STATUS: PAYMENT ACCEPTED & APPROVED**"
-                ),
-                reply_markup=None,
-                parse_mode="Markdown"
-            )
-
-            try:
-                await context.bot.send_message(
-                    chat_id=client_id,
-                    text=(
-                        "🎉 **ደስ ብሎናል! የክፍያ ደረሰኝዎ ጸድቋል!**\n\n"
-                        "እንኳን ደህና መጡ! ፕሮግራምዎ ተከፍቷል። ሳይመን ብጁ ፕሮግራምዎን ከመሥራቱ በፊት, መሰረታዊ የሰውነት መለኪያዎችን እንውሰድ።\n\n"
-                        "⚖️ **የአሁኑ ክብደትዎ በኪሎግራም ስንት ነው?** (ምሳሌ፡ 78)\n\n"
-                        "*(እባክዎ ቁጥር ብቻ ያስገቡ)*"
-                    ),
-                    parse_mode="Markdown"
-                )
-            except Exception as e:
-                logger.error(f"Failed to message client {client_id}: {e}")
-
-        elif action == "reject":
-            state["step"] = "waiting_receipt"
-            await query.edit_message_caption(
-                caption=(query.message.caption or "").replace(
-                    "👇 **Please review the receipt and select an action:**",
-                    "❌ **STATUS: PAYMENT REJECTED**"
-                ),
-                reply_markup=None,
-                parse_mode="Markdown"
-            )
-
-            try:
-                await context.bot.send_message(
-                    chat_id=client_id,
-                    text=(
-                        "❌ **የክፍያ ማረጋገጫ አልተሳካም።** እባክዎ ትክክለኛ እና ግልጽ የሆነ የደረሰኝ ስክሪንሽኦት እንደገና ይላኩ።"
-                    ),
-                    parse_mode="Markdown"
-                )
-            except Exception as e:
-                logger.error(f"Failed to message client {client_id}: {e}")
-
-
-async def client_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles text input from client during weight, height, and notes steps."""
-    user = update.effective_user
-    state = CLIENT_STATES.get(user.id)
-
-    if not state:
+        except Exception:
+            pass
         return
 
-    step = state.get("step")
-    text = update.message.text.strip()
+    lang = record.get("lang", "en")
+    chat_id = record["chat_id"]
+    username = record.get("username", "Client")
+    admin_messages = record.get("admin_messages", [])
+    base_caption = record.get("admin_caption", query.message.caption or "")
+    who = query.from_user.first_name or "an admin"
 
-    if step == "waiting_approval":
-        await update.message.reply_text(
-            "⏳ እባክዎ ሳይመን የክፍያ ደረሰኝዎን እስኪያረጋግጥ ይጠብቁ...",
-            parse_mode="Markdown"
+    await update_all_admin_copies(context, admin_messages, base_caption,
+                                   f"⏳ CONFIRMED by {who} — generating client's plan now...")
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=t(lang,
+               "✅ Payment confirmed! Your plan is now being personally prepared for you.",
+               "✅ ክፍያዎ ተረጋግጧል! የግል ፕሮግራምዎ አሁን እየተዘጋጀ ነው።")
+    )
+
+    stages = t(lang,
+        [
+            "🔍 Reviewing your weight, height and goal...",
+            "🧠 Building your personalized meal structure...",
+            "📄 Formatting your plan into a premium PDF...",
+        ],
+        [
+            "🔍 ክብደትዎን፣ ቁመትዎን እና ግብዎን በመገምገም ላይ...",
+            "🧠 የግል ምግብ ፕሮግራምዎን በመገንባት ላይ...",
+            "📄 ፕሮግራሙን ወደ ፕሪሚየም PDF በመቀየር ላይ...",
+        ]
+    )
+    for stage_text in stages:
+        await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+        await asyncio.sleep(2.5)
+        await context.bot.send_message(chat_id=chat_id, text=stage_text)
+
+    try:
+        plan_text = await asyncio.to_thread(generate_meal_plan_text, record)
+        pdf_path = await asyncio.to_thread(build_meal_plan_pdf, record, plan_text, username)
+    except Exception as e:
+        logger.error("Failed to generate plan/PDF: %s", e)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=t(lang,
+                   "⚠️ Something went wrong preparing your plan. Simon has been notified and will follow up shortly.",
+                   "⚠️ ፕሮግራሙን በማዘጋጀት ላይ ችግር ተፈጥሯል። ሲሞን ተነግሮታል፣ በቅርቡ ያግኙዎታል።")
         )
-        return
-
-    elif step == "weight":
-        try:
-            w_val = float(text)
-            if w_val <= 0 or w_val > 400:
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text(
-                "❌ **ልክ ያልሆነ ቁጥር!** እባክዎ ትክክለኛ ክብደትዎን በኪሎግራም ያስገቡ (ምሳሌ፡ 78)፦",
-                parse_mode="Markdown"
-            )
-            return
-
-        state["weight"] = text
-        state["step"] = "height"
-        await update.message.reply_text(
-            "📏 **ቁመትዎ በሴንቲሜትር ስንት ነው?** (ምሳሌ፡ 178)\n\n"
-            "*(እባክዎ ቁጥር ብቻ ያስገቡ)*",
-            parse_mode="Markdown"
-        )
-
-    elif step == "height":
-        try:
-            h_val = float(text)
-            if h_val <= 50 or h_val > 250:
-                raise ValueError
-        except ValueError:
-            await update.message.reply_text(
-                "❌ **ልክ ያልሆነ ቁጥር!** እባክዎ ትክክለኛ ቁመትዎን በሴንቲሜትር ያስገቡ (ምሳሌ፡ 178)፦",
-                parse_mode="Markdown"
-            )
-            return
-
-        state["height"] = text
-        state["step"] = "notes"
-        await update.message.reply_text(
-            "🩹 **ማንኛውም የሰውነት ጉዳት፣ የጤና ሁኔታ ወይም የማይስማማዎት ምግብ አለ?** *(ከሌለ 'የለም' ብለው ይጻፉ)*",
-            parse_mode="Markdown"
-        )
-
-    elif step == "notes":
-        state["notes"] = text
-
-        success_text = (
-            "✅ **መረጃው ሙሉ በሙሉ ተመዝግቧል!**\n\n"
-            "ሳይመን መረጃዎን እና የክፍያ ደረሰኝዎን ተቀብሏል። የተስተካከለው የ1-ለ-1 የሰውነት ለውጥ ፕሮግራምዎ **በ24 ሰዓታት ውስጥ** እዚሁ ቻት ላይ ይላክልዎታል።"
-        )
-        await update.message.reply_text(success_text, parse_mode="Markdown")
-
-        admin_summary = (
-            "🚀 **New Client Registration Completed!**\n\n"
-            f"👤 **Name:** {user.full_name} (@{user.username or 'No username'})\n"
-            f"🆔 **User ID:** `{user.id}`\n"
-            f"🌍 **Region:** {state.get('region')}\n"
-            f"🎯 **Goal:** {state.get('goal')}\n"
-            f"📞 **Phone:** {state.get('phone')}\n"
-            f"⏱️ **Program:** {state.get('package')}\n"
-            f"⚖️ **Weight:** {state.get('weight')} kg\n"
-            f"📏 **Height:** {state.get('height')} cm\n"
-            f"🩹 **Notes/Injuries:** {state.get('notes')}"
-        )
-
-        receipt_id = state.get("receipt_file_id")
         for admin_id in ADMIN_CHAT_IDS:
             try:
-                await context.bot.send_photo(
-                    chat_id=admin_id,
-                    photo=receipt_id,
-                    caption=admin_summary,
-                    parse_mode="Markdown"
-                )
-            except Exception as e:
-                logger.error(f"Failed to send final summary to admin {admin_id}: {e}")
+                await context.bot.send_message(chat_id=admin_id, text=f"⚠️ PDF generation failed for {username}: {e}")
+            except Exception:
+                pass
+        return
 
-        del CLIENT_STATES[user.id]
+    caption = t(lang,
+        f"🎉 Your personalized {record.get('duration')} meal plan is ready! Stay consistent and check in anytime with questions.",
+        f"🎉 የግል {record.get('duration')} የምግብ ፕሮግራምዎ ተዘጋጅቷል! ወጥነት ይኑርዎት፣ ማንኛውም ጥያቄ ካለዎት ማንኛውም ጊዜ ያግኙን።"
+    )
+    with open(pdf_path, "rb") as pdf_file:
+        await context.bot.send_document(chat_id=chat_id, document=pdf_file, caption=caption)
+
+    try:
+        os.remove(pdf_path)
+    except Exception:
+        pass
+
+    await update_all_admin_copies(context, admin_messages, base_caption,
+                                   f"✅ CONFIRMED by {who} — plan delivered.")
+
+
+async def admin_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    if not is_admin(query.from_user.id):
+        await query.answer("Not authorized.", show_alert=True)
+        return
+    await query.answer()
+
+    user_id = int(query.data.replace("reject_", ""))
+    record = context.bot_data.get("pending", {}).pop(user_id, None)
+    if not record:
+        try:
+            await query.edit_message_caption(
+                caption=(query.message.caption or "") + "\n\n⚠️ Already handled by another admin.",
+                reply_markup=None
+            )
+        except Exception:
+            pass
+        return
+
+    admin_messages = record.get("admin_messages", [])
+    base_caption = record.get("admin_caption", query.message.caption or "")
+    who = query.from_user.first_name or "an admin"
+
+    await update_all_admin_copies(context, admin_messages, base_caption, f"❌ REJECTED by {who}.")
+
+    try:
+        await context.bot.send_message(
+            chat_id=record["chat_id"],
+            text=t(record.get("lang", "en"),
+                   "❌ Payment verification failed. Please send a clear and valid receipt screenshot.",
+                   "❌ የክፍያ ማረጋገጫ አልተሳካም። እባክዎ ግልጽ የሆነ ደረሰኝ እንደገና ይላኩ።")
+        )
+    except Exception:
+        pass
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Cancels the conversation."""
-    user = update.effective_user
-    if user.id in CLIENT_STATES:
-        del CLIENT_STATES[user.id]
     await update.message.reply_text("Process canceled. Send /start to begin again.")
     return ConversationHandler.END
 
@@ -480,8 +494,8 @@ def main():
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("faq", faq_command))
     application.add_handler(MessageHandler(filters.PHOTO, handle_receipt_photo))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, client_text_handler))
-    application.add_handler(CallbackQueryHandler(admin_action_handler, pattern="^(accept_|reject_)"))
+    application.add_handler(CallbackQueryHandler(admin_confirm, pattern="^confirm_"))
+    application.add_handler(CallbackQueryHandler(admin_reject, pattern="^reject_"))
 
     application.run_polling()
 
