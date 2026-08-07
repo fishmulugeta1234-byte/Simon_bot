@@ -1,5 +1,4 @@
 import logging
-import sqlite3
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -21,67 +20,8 @@ logger = logging.getLogger(__name__)
 TOKEN = "8765027788:AAEvkGMDXd8i3EdtqVYgdrnEA4j4Lbdxk4U"
 ADMIN_CHAT_IDS = [1622298145, 389487101]
 
-# Database Setup & Helper Functions
-DB_NAME = "bot_database.db"
-
-def init_db():
-    """Initializes the SQLite database and clients table."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS clients (
-            user_id INTEGER PRIMARY KEY,
-            region TEXT,
-            goal TEXT,
-            package TEXT,
-            phone TEXT,
-            step TEXT,
-            receipt_file_id TEXT,
-            weight TEXT,
-            height TEXT,
-            notes TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-def db_get_client(user_id):
-    """Retrieves client state dictionary from database."""
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM clients WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    if row:
-        return dict(row)
-    return None
-
-def db_set_client(user_id, **kwargs):
-    """Inserts or updates client state parameters in the database."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT user_id FROM clients WHERE user_id = ?", (user_id,))
-    exists = cursor.fetchone()
-    
-    if not exists:
-        cursor.execute("INSERT INTO clients (user_id) VALUES (?)", (user_id,))
-        conn.commit()
-        
-    for key, value in kwargs.items():
-        cursor.execute(f"UPDATE clients SET {key} = ? WHERE user_id = ?", (value, user_id))
-        
-    conn.commit()
-    conn.close()
-
-def db_delete_client(user_id):
-    """Removes client record from database."""
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM clients WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
+# In-memory storage for client onboarding progress
+CLIENT_STATES = {}
 
 # Conversation States (for initial onboarding steps)
 LANGUAGE, REGION, GOAL, PACKAGE, PHONE = range(5)
@@ -90,7 +30,8 @@ LANGUAGE, REGION, GOAL, PACKAGE, PHONE = range(5)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Starts the conversation and asks for language preference."""
     user = update.effective_user
-    db_delete_client(user.id)
+    if user.id in CLIENT_STATES:
+        del CLIENT_STATES[user.id]
 
     keyboard = [
         [
@@ -260,21 +201,20 @@ async def phone_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def payment_instructions(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Receives phone number, displays payment details, and saves state to SQLite."""
+    """Receives phone number, displays payment details, and stores in memory."""
     user = update.effective_user
     phone = update.message.text
     region = context.user_data.get("region")
     goal = context.user_data.get("goal")
     pkg = context.user_data.get("package")
 
-    db_set_client(
-        user.id,
-        region=region,
-        goal=goal,
-        package=pkg,
-        phone=phone,
-        step="waiting_receipt"
-    )
+    CLIENT_STATES[user.id] = {
+        "region": region,
+        "goal": goal,
+        "package": pkg,
+        "phone": phone,
+        "step": "waiting_receipt",
+    }
 
     if region == "reg_eth":
         pay_text = (
@@ -307,17 +247,14 @@ async def payment_instructions(
 async def handle_receipt_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Receives receipt photo from client and sends approval buttons to admins."""
     user = update.effective_user
-    state = db_get_client(user.id)
+    state = CLIENT_STATES.get(user.id)
 
     if not state or state.get("step") != "waiting_receipt":
         return
 
     photo_file = await update.message.photo[-1].get_file()
-    db_set_client(
-        user.id,
-        receipt_file_id=photo_file.file_id,
-        step="waiting_approval"
-    )
+    state["receipt_file_id"] = photo_file.file_id
+    state["step"] = "waiting_approval"
 
     await update.message.reply_text(
         "📸 **የክፍያ ደረሰኝዎ ደርሷል!**\n\nሳይመን ክፍያዎን እስኪያረጋግጥ እባክዎ ትንሽ ይጠብቁ...",
@@ -365,7 +302,7 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     if data.startswith("accept_") or data.startswith("reject_"):
         action, user_id_str = data.split("_")
         client_id = int(user_id_str)
-        state = db_get_client(client_id)
+        state = CLIENT_STATES.get(client_id)
 
         if not state:
             await query.edit_message_caption(
@@ -375,7 +312,7 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             return
 
         if action == "accept":
-            db_set_client(client_id, step="weight")
+            state["step"] = "weight"
             await query.edit_message_caption(
                 caption=(query.message.caption or "").replace(
                     "👇 **Please review the receipt and select an action:**",
@@ -400,7 +337,7 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
                 logger.error(f"Failed to message client {client_id}: {e}")
 
         elif action == "reject":
-            db_set_client(client_id, step="waiting_receipt")
+            state["step"] = "waiting_receipt"
             await query.edit_message_caption(
                 caption=(query.message.caption or "").replace(
                     "👇 **Please review the receipt and select an action:**",
@@ -425,7 +362,7 @@ async def admin_action_handler(update: Update, context: ContextTypes.DEFAULT_TYP
 async def client_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles text input from client during weight, height, and notes steps."""
     user = update.effective_user
-    state = db_get_client(user.id)
+    state = CLIENT_STATES.get(user.id)
 
     if not state:
         return
@@ -452,7 +389,8 @@ async def client_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
 
-        db_set_client(user.id, weight=text, step="height")
+        state["weight"] = text
+        state["step"] = "height"
         await update.message.reply_text(
             "📏 **ቁመትዎ በሴንቲሜትር ስንት ነው?** (ምሳሌ፡ 178)\n\n"
             "*(እባክዎ ቁጥር ብቻ ያስገቡ)*",
@@ -471,15 +409,15 @@ async def client_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
 
-        db_set_client(user.id, height=text, step="notes")
+        state["height"] = text
+        state["step"] = "notes"
         await update.message.reply_text(
             "🩹 **ማንኛውም የሰውነት ጉዳት፣ የጤና ሁኔታ ወይም የማይስማማዎት ምግብ አለ?** *(ከሌለ 'የለም' ብለው ይጻፉ)*",
             parse_mode="Markdown"
         )
 
     elif step == "notes":
-        db_set_client(user.id, notes=text)
-        state = db_get_client(user.id)
+        state["notes"] = text
 
         success_text = (
             "✅ **መረጃው ሙሉ በሙሉ ተመዝግቧል!**\n\n"
@@ -512,20 +450,19 @@ async def client_text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             except Exception as e:
                 logger.error(f"Failed to send final summary to admin {admin_id}: {e}")
 
-        # Clean up database record upon completion
-        db_delete_client(user.id)
+        del CLIENT_STATES[user.id]
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Cancels the conversation."""
     user = update.effective_user
-    db_delete_client(user.id)
+    if user.id in CLIENT_STATES:
+        del CLIENT_STATES[user.id]
     await update.message.reply_text("Process canceled. Send /start to begin again.")
     return ConversationHandler.END
 
 
 def main():
-    init_db()
     application = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
