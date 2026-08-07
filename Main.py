@@ -52,7 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
 
     try:
-        with open("welcome.jpg", "rb") as photo_file:
+        with open("welcome.jpeg", "rb") as photo_file:
             await update.message.reply_photo(
                 photo=photo_file, caption=welcome_text, reply_markup=reply_markup
             )
@@ -223,7 +223,7 @@ async def payment_instructions(
 
 
 async def receive_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives receipt photo, sends weight.jpg visual, and asks for current weight."""
+    """Receives receipt photo, sends weight.jpeg visual, and asks for current weight."""
     photo_file = await update.message.photo[-1].get_file()
     context.user_data["receipt_file_id"] = photo_file.file_id
 
@@ -234,7 +234,7 @@ async def receive_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
     try:
-        with open("weight.jpg", "rb") as photo_file:
+        with open("weight.jpeg", "rb") as photo_file:
             await update.message.reply_photo(
                 photo=photo_file, caption=weight_caption, parse_mode="Markdown"
             )
@@ -265,7 +265,7 @@ async def receive_height(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def finish_onboarding(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Stores notes, sends success.jpg confirmation to user, and forwards card to both admins."""
+    """Stores notes, sends success.jpeg confirmation to user, and forwards card to both admins."""
     context.user_data["notes"] = update.message.text
     user = update.effective_user
 
@@ -275,7 +275,7 @@ async def finish_onboarding(
     )
 
     try:
-        with open("success.jpg", "rb") as photo_file:
+        with open("success.jpeg", "rb") as photo_file:
             await update.message.reply_photo(
                 photo=photo_file, caption=success_caption, parse_mode="Markdown"
             )
