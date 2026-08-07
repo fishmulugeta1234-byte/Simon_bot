@@ -47,18 +47,56 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     welcome_text = (
         "Welcome to Simon's Transformation Portal! Please select your language / "
-        "ወደ ሳይመን የግል የሰውነት ለውጥ መግቢያ እንኳን በደህና መጡ። እባክዎ ቋንቋ ይምረጡ፦"
+        "ወደ ሳይመን የግል የሰውነት ለውጥ መግቢያ እንኳን በደህና መጡ። እባክዎ ቋንቋ ይምረጡ፦\n\n"
+        "💡 *Tip: Type /faq anytime to compare all program tiers and pricing.*"
     )
 
     try:
         with open("welcome.jpeg", "rb") as photo_file:
             await update.message.reply_photo(
-                photo=photo_file, caption=welcome_text, reply_markup=reply_markup
+                photo=photo_file, caption=welcome_text, reply_markup=reply_markup, parse_mode="Markdown"
             )
     except FileNotFoundError:
-        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode="Markdown")
 
     return LANGUAGE
+
+
+async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays detailed program tiers, local pricing, and international options FAQ."""
+    faq_text = (
+        "📌 **Simon Origin — Program Tiers & Investment Guide**\n\n"
+        "🌍 **For International (Outsider) Clients:**\n"
+        "• **Featured Program:** Transformation (60-Days) — **$110 USD**\n"
+        "• **Payment Method:** Easily send via Remitly or international transfer apps to our CBE/Telebirr account.\n\n"
+        "--- \n\n"
+        "🇪🇹 **For Local (Ethiopia) Clients — Full Tier Breakdown:**\n\n"
+        "🥗 **Meal Plan Only**\n"
+        "• **Investment:** 799 ETB\n"
+        "• **Focus:** Customized standalone nutrition and macro guidance.\n\n"
+        "🥉 **Kickstart (21 Days)**[span_0](start_span)[span_0](end_span)\n"
+        "• **Investment:** 3,500 ETB[span_1](start_span)[span_1](end_span)\n"
+        "• **Best for:** Beginners building momentum[span_2](start_span)[span_2](end_span).\n"
+        "• **Includes:** Fixed workout plan, 1 meal plan, 1 total adjustment, weekly check-ins (3 total), and basic progress tracking[span_3](start_span)[span_3](end_span).\n\n"
+        "🥈 **Transformation (60 Days)**[span_4](start_span)[span_4](end_span)\n"
+        "• **Investment:** 7,000 ETB[span_5](start_span)[span_5](end_span)\n"
+        "• **Best for:** Fat loss and muscle-building with consistent coaching[span_6](start_span)[span_6](end_span).\n"
+        "• **Includes:** Workouts updated every 4 weeks, adjusted meal plan, check-ins every 4 weeks, up to 5 form reviews/month, and basic habit coaching[span_7](start_span)[span_7](end_span).\n\n"
+        "🥇 **Elite (90 Days)**[span_8](start_span)[span_8](end_span)\n"
+        "• **Investment:** 9,500 ETB[span_9](start_span)[span_9](end_span)\n"
+        "• **Best for:** Serious long-term results[span_10](start_span)[span_10](end_span).\n"
+        "• **Includes:** Fully custom workouts, unlimited meal plan adjustments, weekly check-ins (~13), anytime exercise form reviews, bi-weekly progress reviews, and 24-hr priority support[span_11](start_span)[span_11](end_span).\n\n"
+        "💎 **Lifestyle (6 Months)**[span_12](start_span)[span_12](end_span)\n"
+        "• **Investment:** 18,000 ETB[span_13](start_span)[span_13](end_span)\n"
+        "• **Best for:** Permanent lifestyle change[span_14](start_span)[span_14](end_span).\n"
+        "• **Includes:** New workout phase monthly, continuous meal plans, unlimited progress reviews, long-term habit coaching, monthly goal-setting sessions, and plateau-solving strategies[span_15](start_span)[span_15](end_span).\n\n"
+        "👑 **VIP (6 Months)**[span_16](start_span)[span_16](end_span)\n"
+        "• **Investment:** 30,000 ETB[span_17](start_span)[span_17](end_span)\n"
+        "• **Best for:** Highest level of 1-on-1 support[span_18](start_span)[span_18](end_span).\n"
+        "• **Includes:** Live-adjusted workouts, on-demand meal plans, weekly 30-45 min video calls, unlimited form reviews, travel/restaurant nutrition guidance, direct accountability outreach, and same-day priority support[span_19](start_span)[span_19](end_span).\n\n"
+        "💡 **Ready to begin?** Send `/start` to launch the onboarding portal!"
+    )
+    await update.message.reply_text(faq_text, parse_mode="Markdown")
 
 
 async def region_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -333,6 +371,7 @@ def main():
     )
 
     application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("faq", faq_command))
     application.run_polling()
 
 
