@@ -1,4 +1,5 @@
 import logging
+import os
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -16,9 +17,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# CONFIGURATION (Replace these with your actual credentials)
-TOKEN = "YOUR_BOT_TOKEN_FROM_BOTFATHER"
-ADMIN_CHAT_ID = 123456789  # Replace with your numeric Telegram user ID
+# CONFIGURATION
+TOKEN = "8765027788:AAEvkGMDXd8i3EdtqVYgdrnEA4j4Lbdxk4U"
+ADMIN_CHAT_IDS = [1622298145, 389487101]  # Both admin chat IDs configured
 
 # Conversation States
 (
@@ -35,7 +36,7 @@ ADMIN_CHAT_ID = 123456789  # Replace with your numeric Telegram user ID
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Starts the conversation and asks for language preference."""
+    """Sends the welcome image banner and asks for language preference."""
     keyboard = [
         [
             InlineKeyboardButton("🇺🇸 English", callback_data="lang_en"),
@@ -50,7 +51,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "እባክዎ ቋንቋ ይምረጡ፦"
     )
 
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    try:
+        with open("welcome.jpg", "rb") as photo_file:
+            await update.message.reply_photo(
+                photo=photo_file, caption=welcome_text, reply_markup=reply_markup
+            )
+    except FileNotFoundError:
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+
     return LANGUAGE
 
 
@@ -149,7 +157,6 @@ async def package_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             ],
         ]
     else:
-        # International pricing example ($110 USD)
         keyboard = [
             [
                 InlineKeyboardButton(
@@ -200,7 +207,7 @@ async def payment_instructions(
         )
     else:
         pay_text = (
-            "💳 **Payment Instructions (International)**\n\n"
+            "💳 **Payment Instructions (USA, Canada, Europe & Other)**\n\n"
             f"⏱️ **Selected Program:** {pkg}\n"
             "💰 **Total Fee:** $110 USD\n\n"
             "📲 **How to Pay:**\n"
@@ -216,15 +223,24 @@ async def payment_instructions(
 
 
 async def receive_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Receives receipt photo and asks for current weight."""
+    """Receives receipt photo, sends weight.jpg visual, and asks for current weight."""
     photo_file = await update.message.photo[-1].get_file()
     context.user_data["receipt_file_id"] = photo_file.file_id
 
-    await update.message.reply_text(
+    weight_caption = (
         "🎉 **ደስ ብሎናል! የክፍያ ደረሰኝዎ በሰላም ደርሶናል!**\n\n"
         "እንኳን ደህና መጡ! ፕሮግራምዎ ተከፍቷል። ሳይመን ብጁ ፕሮግራምዎን ከመሥራቱ በፊት, መሰረታዊ የሰውነት መለኪያዎችን እንውሰድ።\n\n"
         "⚖️ **የአሁኑ ክብደትዎ በኪሎግራም ስንት ነው?** (ምሳሌ፡ 78)"
     )
+
+    try:
+        with open("weight.jpg", "rb") as photo_file:
+            await update.message.reply_photo(
+                photo=photo_file, caption=weight_caption, parse_mode="Markdown"
+            )
+    except FileNotFoundError:
+        await update.message.reply_text(weight_caption, parse_mode="Markdown")
+
     return WEIGHT
 
 
@@ -249,17 +265,23 @@ async def receive_height(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 async def finish_onboarding(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-    """Stores notes, finalizes onboarding, and sends admin card."""
+    """Stores notes, sends success.jpg confirmation to user, and forwards card to both admins."""
     context.user_data["notes"] = update.message.text
     user = update.effective_user
 
-    # Send confirmation to user
-    await update.message.reply_text(
+    success_caption = (
         "✅ **መረጃው ሙሉ በሙሉ ተመዝግቧል!**\n\n"
         "ሳይመን መረጃዎን እና የክፍያ ደረሰኝዎን ተቀብሏል። የተስተካከለው የ1-ለ-1 የሰውነት ለውጥ ፕሮግራምዎ **በ24 ሰዓታት ውስጥ** እዚሁ ቻት ላይ ይላክልዎታል።"
     )
 
-    # Compile Admin Notification Card
+    try:
+        with open("success.jpg", "rb") as photo_file:
+            await update.message.reply_photo(
+                photo=photo_file, caption=success_caption, parse_mode="Markdown"
+            )
+    except FileNotFoundError:
+        await update.message.reply_text(success_caption, parse_mode="Markdown")
+
     admin_text = (
         "🚀 **New Client Registration!**\n\n"
         f"👤 **Name:** {user.full_name} (@{user.username or 'No username'})\n"
@@ -273,11 +295,15 @@ async def finish_onboarding(
         f"🩹 **Notes/Injuries:** {context.user_data.get('notes')}"
     )
 
-    # Forward receipt and details to Admin
     receipt_id = context.user_data.get("receipt_file_id")
-    await context.bot.send_photo(
-        chat_id=ADMIN_CHAT_ID, photo=receipt_id, caption=admin_text, parse_mode="Markdown"
-    )
+    
+    for admin_id in ADMIN_CHAT_IDS:
+        try:
+            await context.bot.send_photo(
+                chat_id=admin_id, photo=receipt_id, caption=admin_text, parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send admin notification to {admin_id}: {e}")
 
     return ConversationHandler.END
 
