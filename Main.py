@@ -46,9 +46,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     welcome_text = (
-        "ወደ ሳይመን የግል የሰውነት ለውጥ መግቢያ እንኳን በደህና መጡ። "
-        "ከእርስዎ አካል ጋር ሙሉ በሙሉ የተጣጣሙ 1-ለ-1 የተዘጋጁ የስልጠና እና የምግብ እቅዶችን እንሰራለን።\n\n"
-        "እባክዎ ቋንቋ ይምረጡ፦"
+        "Welcome to Simon's Transformation Portal! Please select your language / "
+        "ወደ ሳይመን የግል የሰውነት ለውጥ መግቢያ እንኳን በደህና መጡ። እባክዎ ቋንቋ ይምረጡ፦"
     )
 
     try:
