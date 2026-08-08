@@ -24,9 +24,9 @@ logging.basicConfig(
 )
 
 # ==========================================
-# ⚙️ YOUR CONFIGURATION & CONSTANTS
+# ⚙️ CONFIGURATION & CONSTANTS
 # ==========================================
-BOT_TOKEN = "8765027788:AAEvkGMDXd8i3EdtqVYgdrnEA4j4Lbdxk4U"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_USER_IDS = [1622298145, 389487101]  # Both Admin IDs
 
 # Banking & Payment Info
@@ -95,7 +95,6 @@ def save_lead_to_google_sheet(user_data, user):
     client = gspread.authorize(creds)
     sheet = client.open(GOOGLE_SHEET_NAME).sheet1
 
-    # Generate exact registration timestamp with short month format (e.g. 2026-Aug-06 07:41:17)
     registration_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
 
     row_data = [
@@ -140,84 +139,56 @@ def save_lead_to_google_sheet(user_data, user):
 
 
 # ==========================================
-# 📋 FAQ COMMAND & PRICING HELPER
+# 📋 FAQ & PRICING CLARITY HELPER
 # ==========================================
 def get_faq_text(loc):
   if loc == "et":
     return (
-        "📋 <b>Simon's Fitness Programs: Local Tier Guide (ETB)</b>\n\n"
-        "• <b>Meal Plan Only — 799 ETB:</b> Custom nutrition plan tailored to"
-        " your goals.\n\n"
-        "• <b>Kickstart (21 Days) — 3,500 ETB:</b> Best for beginners building"
-        " momentum. Includes fixed workout, 1 meal plan, 1 adjustment, and 3"
-        " check-ins.\n\n"
-        "• <b>Transformation (60 Days) — 7,000 ETB:</b> Best for fat loss &"
-        " muscle building. Includes workout updated every 4 weeks, adjusted meal"
-        " plan, 8 check-ins, and form reviews.\n\n"
-        "• <b>Elite (90 Days) — 9,500 ETB:</b> Best for serious long-term"
-        " results. Fully custom workouts, unlimited meal adjustments, ~13"
-        " check-ins, and 24-hr priority support. <i>(⚠️ Only 5 spots available"
-        " this month!)</i>\n\n"
-        "• <b>Lifestyle (6 Months) — 18,000 ETB:</b> Best for permanent lifestyle"
-        " change. New workout phase monthly, continuous planning, ongoing"
-        " check-ins, and monthly goal setting.\n\n"
-        "• <b>VIP (6 Months) — 30,000 ETB:</b> Maximum 1-on-1 support."
-        " Live-adjusted plans, weekly video calls, unlimited messaging & form"
-        " reviews, and supplement guidance.\n\n"
-        f"❓ Have questions? Contact Simon directly at {SUPPORT_HANDLE}"
+        "📋 <b>የፕሮግራሞች ዝርዝር መግለጫ (FAQ)</b>\n\n"
+        "• <b>የምግብ እቅድ ብቻ (799 ETB):</b> ለእርስዎ ግብ እና አካል የተዘጋጀ ብጁ የምግብ ዝግጅት"
+        " እቅድ ብቻ።\n\n"
+        "• <b>ፈጣን ጅማሬ / 21 ቀናት (3,500 ETB):</b> ለጀማሪዎች ፍጹም ነው። ቋሚ የስፖርት ዕቅድ፣"
+        " 1 የምግብ ዕቅድ፣ 1 ማስተካከያ እና 3 ክትትሎችን ያካትታል።\n\n"
+        "• <b>የሰውነት ለውጥ / 60 ቀናት (7,000 ETB):</b> ስብን ለመቀነስ እና ጡንቻ ለመገንባት።"
+        " በየ 4 ሳምንቱ የሚቀየር ስፖርት፣ የተስተካከለ የምግብ ዕቅድ፣ 8 ክትትሎች እና የአሰራር"
+        " ግምገማ።\n\n"
+        "• <b>Elite / 90 ቀናት (9,500 ETB):</b> ለረጅም ጊዜ ጠንካራ ውጤት። ሙሉ በሙሉ ለእርስዎ"
+        " የተዘጋጀ ስፖርት፣ ያልተወሰነ የምግብ ማስተካከያ፣ ~13 ክትትሎች እና የ24 ሰዓት ቅድሚያ"
+        " ድጋፍ።\n\n"
+        "• <b>Lifestyle / 6 ወራት (18,000 ETB):</b> የረጅም ጊዜ የአኗኗር ዘይቤ ለውጥ። በየወሩ"
+        " አዲስ የስፖርት ምዕራፍ፣ ቀጣይነት ያለው እቅድ እና ወርሃዊ የግብ ማስተካከያ።\n\n"
+        "• <b>ቪአይፒ / 6 ወራት (30,000 ETB):</b> ከፍተኛው የ1-ለ-1 ድጋፍ። በየጊዜው የሚስተካከሉ"
+        " እቅዶች፣ ሳምንታዊ የቪዲዮ ጥሪዎች፣ ያልተወሰነ መልዕክት መለዋወጥ እና የተጨማሪ ምግብ"
+        " መምሪያ።\n\n"
+        f"❓ ጥያቄ ካለዎት በቀጥታ ያግኙን፦ {SUPPORT_HANDLE}"
     )
   else:
     return (
-        "📋 <b>Simon's Fitness Programs: Diaspora Tier Guide (USD)</b>\n\n"
-        "• <b>Meal Plan Only — $29.99:</b> Custom nutrition plan tailored to"
-        " your goals.\n\n"
-        "• <b>Kickstart (21 Days) — $35:</b> Best for beginners building"
+        "📋 <b>Program Details & Clarity (FAQ)</b>\n\n"
+        "• <b>Meal Plan Only ($29.99):</b> Custom nutrition plan tailored"
+        " precisely to your goals.\n\n"
+        "• <b>Kickstart / 21 Days ($35):</b> Best for beginners building"
         " momentum. Includes fixed workout, 1 meal plan, 1 adjustment, and 3"
         " check-ins.\n\n"
-        "• <b>Transformation (60 Days) — $89:</b> Best for fat loss & muscle"
-        " building. Includes workout updated every 4 weeks, adjusted meal plan,"
+        "• <b>Transformation / 60 Days ($89):</b> Best for fat loss & muscle"
+        " building. Includes workouts updated every 4 weeks, adjusted meal plan,"
         " 8 check-ins, and form reviews.\n\n"
-        "• <b>Elite (90 Days) — $129:</b> Best for serious long-term results."
+        "• <b>Elite / 90 Days ($129):</b> Best for serious long-term results."
         " Fully custom workouts, unlimited meal adjustments, ~13 check-ins, and"
-        " 24-hr priority support. <i>(⚠️ Only 5 spots available this"
-        " month!)</i>\n\n"
-        "• <b>Lifestyle (6 Months) — $249:</b> Best for permanent lifestyle"
+        " 24-hr priority support.\n\n"
+        "• <b>Lifestyle / 6 Months ($249):</b> Best for permanent lifestyle"
         " change. New workout phase monthly, continuous planning, ongoing"
         " check-ins, and monthly goal setting.\n\n"
-        "• <b>VIP (6 Months) — $449:</b> Maximum 1-on-1 support. Live-adjusted"
+        "• <b>VIP / 6 Months ($449):</b> Maximum 1-on-1 support. Live-adjusted"
         " plans, weekly video calls, unlimited messaging & form reviews, and"
         " supplement guidance.\n\n"
-        f"❓ Have questions? Contact Simon directly at {SUPPORT_HANDLE}"
+        f"❓ Questions? Contact Simon directly: {SUPPORT_HANDLE}"
     )
 
 
 async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-  loc_type = context.user_data.get("location_type")
-
-  if loc_type == "et":
-    await update.message.reply_text(get_faq_text("et"), parse_mode="HTML")
-  elif loc_type == "diaspora":
-    await update.message.reply_text(get_faq_text("diaspora"), parse_mode="HTML")
-  else:
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "🇪🇹 Local Pricing (ETB)", callback_data="faq_et"
-            )
-        ],
-        [
-            InlineKeyboardButton(
-                "🌎 Diaspora Pricing (USD)", callback_data="faq_diaspora"
-            )
-        ],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "📋 <b>Simon's Fitness Programs</b>\n\nPlease select your region to view"
-        " the correct program pricing tiers:",
-        reply_markup=reply_markup,
-        parse_mode="HTML",
-    )
+  loc_type = context.user_data.get("location_type", "et")
+  await update.message.reply_text(get_faq_text(loc_type), parse_mode="HTML")
 
 
 async def faq_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -225,7 +196,7 @@ async def faq_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
   await query.answer()
   loc = query.data.split("_")[1]
   text = get_faq_text(loc)
-  await query.edit_message_text(text, parse_mode="HTML")
+  await query.message.reply_text(text, parse_mode="HTML")
 
 
 # ==========================================
@@ -258,7 +229,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
   await update.message.reply_text(
       "Welcome to Simon's Transformation Portal! Please select your language /"
-      " እባክዎ ቋንቋ ይምረጡ፦\n\n<i>(Type /faq anytime to compare program tiers)</i>",
+      " እባክዎ ቋንቋ ይምረጡ፦\n\n<i>(Type /faq anytime to review program details)</i>",
       reply_markup=reply_markup,
   )
   return LANGUAGE
@@ -358,7 +329,6 @@ async def location_choice(
   context.user_data["location_type"] = location_type
   lang = context.user_data.get("lang", "am")
 
-  # Teaser line (200 clients part eliminated)
   if lang == "am":
     teaser_msg = (
         "⏳ <b>በግምት በ3 ደቂቃ ውስጥ የእርስዎን ብጁ (Custom) ዕቅድ እናዘጋጃለን —"
@@ -513,43 +483,53 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
   context.user_data["phone"] = update.message.text.strip()
   loc_type = context.user_data.get("location_type", "et")
 
+  faq_btn_text = (
+      "📋 የፕሮግራም ዝርዝር ማየት (FAQ)"
+      if lang == "am"
+      else "📋 View Program Details (FAQ)"
+  )
+
   if lang == "am":
     if loc_type == "et":
       keyboard = [
           [
               InlineKeyboardButton(
-                  "🥗 የምግብ እቅድ ብቻ (Meal Plan Only) — 799 ETB",
+                  faq_btn_text, callback_data=f"faq_{loc_type}"
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥗 የምግብ እቅድ ብቻ — 799 ETB",
                   callback_data="dur_Meal_Plan_Only_799ETB",
               )
           ],
           [
               InlineKeyboardButton(
-                  "🥉 Kickstart (21-ቀን ፈጣን ጅማሬ) — 3,500 ETB",
+                  "🥉 ፈጣን ጅማሬ (21 ቀናት) — 3,500 ETB",
                   callback_data="dur_Kickstart_(21_Days)_3500ETB",
               )
           ],
           [
               InlineKeyboardButton(
-                  "🥈 Transformation (60-ቀን የሰውነት ለውጥ) — 7,000 ETB",
+                  "🥈 የሰውነት ለውጥ (60 ቀናት) — 7,000 ETB",
                   callback_data="dur_Transformation_(60_Days)_7000ETB",
               )
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ) ⚠️ (በዚህ ወር 5 ቦታዎች ብቻ!) —"
-                  " 9,500 ETB",
+                  "🥇 Elite (90 ቀናት) — 9,500 ETB",
                   callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
               )
           ],
           [
               InlineKeyboardButton(
-                  "💎 Lifestyle (6-ወር የአኗኗር ዘይቤ) — 18,000 ETB",
+                  "💎 Lifestyle (6 ወራት) — 18,000 ETB",
                   callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
               )
           ],
           [
               InlineKeyboardButton(
-                  "👑 VIP (6-ወር ቪአይፒ) — 30,000 ETB",
+                  "👑 ቪአይፒ (6 ወራት) — 30,000 ETB",
                   callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
               )
           ],
@@ -558,38 +538,42 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
       keyboard = [
           [
               InlineKeyboardButton(
-                  "🥗 የምግብ እቅድ ብቻ (Meal Plan Only) — $29.99",
+                  faq_btn_text, callback_data=f"faq_{loc_type}"
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥗 የምግብ እቅድ ብቻ — $29.99",
                   callback_data="dur_Meal_Plan_Only_$29.99",
               )
           ],
           [
               InlineKeyboardButton(
-                  "🥉 Kickstart (21-ቀን ፈጣን ጅማሬ) — $35",
+                  "🥉 ፈጣን ጅማሬ (21 ቀናት) — $35",
                   callback_data="dur_Kickstart_(21_Days)_$35",
               )
           ],
           [
               InlineKeyboardButton(
-                  "🥈 Transformation (60-ቀን የሰውነት ለውጥ) — $89",
+                  "🥈 የሰውነት ለውጥ (60 ቀናት) — $89",
                   callback_data="dur_Transformation_(60_Days)_$89",
               )
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90-ቀን ከፍተኛ ደረጃ) ⚠️ (Only 5 spots this month!)"
-                  " — $129",
+                  "🥇 Elite (90 ቀናት) — $129",
                   callback_data="dur_Elite_Transformation_(90_Days)_$129",
               )
           ],
           [
               InlineKeyboardButton(
-                  "💎 Lifestyle (6-ወር የአኗኗር ዘይቤ) — $249",
+                  "💎 Lifestyle (6 ወራት) — $249",
                   callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
               )
           ],
           [
               InlineKeyboardButton(
-                  "👑 VIP (6-ወር ቪአይፒ) — $449",
+                  "👑 ቪአይፒ (6 ወራት) — $449",
                   callback_data="dur_VIP_Coaching_(6_Months)_$449",
               )
           ],
@@ -597,6 +581,11 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
   else:
     if loc_type == "et":
       keyboard = [
+          [
+              InlineKeyboardButton(
+                  faq_btn_text, callback_data=f"faq_{loc_type}"
+              )
+          ],
           [
               InlineKeyboardButton(
                   "🥗 Meal Plan Only — 799 ETB",
@@ -617,8 +606,7 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90 Days) ⚠️ (Only 5 spots this month!) — 9,500"
-                  " ETB",
+                  "🥇 Elite (90 Days) — 9,500 ETB",
                   callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
               )
           ],
@@ -639,6 +627,11 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
       keyboard = [
           [
               InlineKeyboardButton(
+                  faq_btn_text, callback_data=f"faq_{loc_type}"
+              )
+          ],
+          [
+              InlineKeyboardButton(
                   "🥗 Meal Plan Only — $29.99",
                   callback_data="dur_Meal_Plan_Only_$29.99",
               )
@@ -657,7 +650,7 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
           ],
           [
               InlineKeyboardButton(
-                  "🥇 Elite (90 Days) ⚠️ (Only 5 spots this month!) — $129",
+                  "🥇 Elite (90 Days) — $129",
                   callback_data="dur_Elite_Transformation_(90_Days)_$129",
               )
           ],
@@ -677,14 +670,12 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 
   text = (
       "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n"
-      "⚠️ <i>ማስታወሻ፦ ለኤሊት (Elite) ፓኬጅ በዚህ ወር ተቀባይነት ያላቸው <b>5 ሰዎች ብቻ</b>"
-      " ናቸው!\n\n</i>"
-      "💡 <i>የምርጫ ልዩነቶችን ለማየት /faq የሚለውን ትዕዛዝ መጠቀም ይችላሉ።</i>"
+      "💡 <i>እያንዳንዱ ፓኬጅ ምንን እንደሚያካትት ለማየት ከላይ ያለውን የዝርዝር መግለጫ (FAQ) ቁልፍ መጫን"
+      " ይችላሉ።</i>"
       if lang == "am"
       else (
-          "⏱️ <b>Select your transformation timeframe:</b>\n\n⚠️ <i>Note: Only"
-          " accepting 5 new Elite clients this month!\n\n</i>💡 <i>Type /faq"
-          " anytime to review tier differences.</i>"
+          "⏱️ <b>Select your transformation timeframe:</b>\n\n💡 <i>Tap the FAQ"
+          " button above anytime to see what each tier includes.</i>"
       )
   )
   reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1085,7 +1076,6 @@ async def post_diet_input(
   lang = context.user_data.get("lang", "am")
   context.user_data["diet"] = update.message.text.strip()
 
-  # Save full client data and timestamp to Google Sheet now that questionnaire is complete after approval
   save_lead_to_google_sheet(context.user_data, user)
 
   if lang == "am":
@@ -1156,18 +1146,12 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-  await update.message.reply_text("Process cancelled.")
-  return ConversationHandler.END
-
-
 # ==========================================
 # 🏁 MAIN ENTRY POINT WITH PERSISTENCE
 # ==========================================
 def main():
   threading.Thread(target=run_web_server, daemon=True).start()
 
-  # Enable persistence so users never lose their progress
   persistence = PicklePersistence(filepath="bot_persistence")
 
   app = (
@@ -1177,11 +1161,9 @@ def main():
       .build()
   )
 
-  # Add standalone FAQ command and callback handlers
   app.add_handler(CommandHandler("faq", faq_command))
   app.add_handler(CallbackQueryHandler(faq_callback, pattern="^faq_"))
 
-  # Primary Onboarding Conversation Handler (Stops at RECEIPT upload awaiting admin approval)
   conv_handler = ConversationHandler(
       entry_points=[CommandHandler("start", start)],
       states={
@@ -1200,12 +1182,11 @@ def main():
           DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
           RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
       },
-      fallbacks=[CommandHandler("cancel", cancel)],
+      fallbacks=[],
       name="onboarding_conversation",
       persistent=True,
   )
 
-  # Post-Approval Questionnaire Conversation Handler (Triggered after admin clicks Confirm)
   post_conv_handler = ConversationHandler(
       entry_points=[
           CallbackQueryHandler(resume_assessment, pattern="^resume_assessment$")
@@ -1230,7 +1211,7 @@ def main():
               MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)
           ],
       },
-      fallbacks=[CommandHandler("cancel", cancel)],
+      fallbacks=[],
       name="post_payment_conversation",
       persistent=True,
   )
