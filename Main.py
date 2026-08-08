@@ -139,7 +139,7 @@ def save_lead_to_google_sheet(user_data, user):
 
 
 # ==========================================
-# 📋 FAQ & PRICING CLARITY HELPER
+# 📋 FAQ & PRICING CLARITY HELPERS
 # ==========================================
 def get_faq_text(loc):
   if loc == "et":
@@ -186,17 +186,213 @@ def get_faq_text(loc):
     )
 
 
-async def faq_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-  loc_type = context.user_data.get("location_type", "et")
-  await update.message.reply_text(get_faq_text(loc_type), parse_mode="HTML")
+def get_pricing_keyboard(lang, loc_type):
+  faq_btn_text = (
+      "📋 የፕሮግራም ዝርዝር ማየት (FAQ)"
+      if lang == "am"
+      else "📋 View Program Details (FAQ)"
+  )
+  if lang == "am":
+    if loc_type == "et":
+      return [
+          [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
+          [
+              InlineKeyboardButton(
+                  "🥗 የምግብ እቅድ ብቻ — 799 ETB",
+                  callback_data="dur_Meal_Plan_Only_799ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 ፈጣን ጅማሬ (21 ቀናት) — 3,500 ETB",
+                  callback_data="dur_Kickstart_(21_Days)_3500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 የሰውነት ለውጥ (60 ቀናት) — 7,000 ETB",
+                  callback_data="dur_Transformation_(60_Days)_7000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90 ቀናት) — 9,500 ETB",
+                  callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6 ወራት) — 18,000 ETB",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 ቪአይፒ (6 ወራት) — 30,000 ETB",
+                  callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
+              )
+          ],
+      ]
+    else:
+      return [
+          [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
+          [
+              InlineKeyboardButton(
+                  "🥗 የምግብ እቅድ ብቻ — $29.99",
+                  callback_data="dur_Meal_Plan_Only_$29.99",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 ፈጣን ጅማሬ (21 ቀናት) — $35",
+                  callback_data="dur_Kickstart_(21_Days)_$35",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 የሰውነት ለውጥ (60 ቀናት) — $89",
+                  callback_data="dur_Transformation_(60_Days)_$89",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90 ቀናት) — $129",
+                  callback_data="dur_Elite_Transformation_(90_Days)_$129",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6 ወራት) — $249",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 ቪአይፒ (6 ወራት) — $449",
+                  callback_data="dur_VIP_Coaching_(6_Months)_$449",
+              )
+          ],
+      ]
+  else:
+    if loc_type == "et":
+      return [
+          [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
+          [
+              InlineKeyboardButton(
+                  "🥗 Meal Plan Only — 799 ETB",
+                  callback_data="dur_Meal_Plan_Only_799ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 Kickstart (21 Days) — 3,500 ETB",
+                  callback_data="dur_Kickstart_(21_Days)_3500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 Transformation (60 Days) — 7,000 ETB",
+                  callback_data="dur_Transformation_(60_Days)_7000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90 Days) — 9,500 ETB",
+                  callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6 Months) — 18,000 ETB",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 VIP (6 Months) — 30,000 ETB",
+                  callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
+              )
+          ],
+      ]
+    else:
+      return [
+          [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
+          [
+              InlineKeyboardButton(
+                  "🥗 Meal Plan Only — $29.99",
+                  callback_data="dur_Meal_Plan_Only_$29.99",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥉 Kickstart (21 Days) — $35",
+                  callback_data="dur_Kickstart_(21_Days)_$35",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥈 Transformation (60 Days) — $89",
+                  callback_data="dur_Transformation_(60_Days)_$89",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "🥇 Elite (90 Days) — $129",
+                  callback_data="dur_Elite_Transformation_(90_Days)_$129",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "💎 Lifestyle (6 Months) — $249",
+                  callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
+              )
+          ],
+          [
+              InlineKeyboardButton(
+                  "👑 VIP (6 Months) — $449",
+                  callback_data="dur_VIP_Coaching_(6_Months)_$449",
+              )
+          ],
+      ]
 
 
 async def faq_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
   query = update.callback_query
   await query.answer()
   loc = query.data.split("_")[1]
+  lang = context.user_data.get("lang", "am")
   text = get_faq_text(loc)
-  await query.message.reply_text(text, parse_mode="HTML")
+
+  back_text = "🔙 ወደ ዋጋዎች መመለስ" if lang == "am" else "🔙 Back to Pricing"
+  back_keyboard = [
+      [InlineKeyboardButton(back_text, callback_data=f"back_pricing_{loc}")]
+  ]
+  reply_markup = InlineKeyboardMarkup(back_keyboard)
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+
+
+async def back_to_pricing_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+):
+  query = update.callback_query
+  await query.answer()
+  loc_type = query.data.split("_")[2]
+  lang = context.user_data.get("lang", "am")
+
+  keyboard = get_pricing_keyboard(lang, loc_type)
+  reply_markup = InlineKeyboardMarkup(keyboard)
+
+  text = (
+      "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n"
+      "💡 <i>እያንዳንዱ ፓኬጅ ምንን እንደሚያካትት ለማየት ከላይ ያለውን የዝርዝር መግለጫ (FAQ) ቁልፍ መጫን"
+      " ይችላሉ።</i>"
+      if lang == "am"
+      else (
+          "⏱️ <b>Select your transformation timeframe:</b>\n\n💡 <i>Tap the FAQ"
+          " button above anytime to see what each tier includes.</i>"
+      )
+  )
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
 
 
 # ==========================================
@@ -229,7 +425,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
   await update.message.reply_text(
       "Welcome to Simon's Transformation Portal! Please select your language /"
-      " እባክዎ ቋንቋ ይምረጡ፦\n\n<i>(Type /faq anytime to review program details)</i>",
+      " እባክዎ ቋንቋ ይምረጡ፦",
       reply_markup=reply_markup,
   )
   return LANGUAGE
@@ -483,190 +679,7 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
   context.user_data["phone"] = update.message.text.strip()
   loc_type = context.user_data.get("location_type", "et")
 
-  faq_btn_text = (
-      "📋 የፕሮግራም ዝርዝር ማየት (FAQ)"
-      if lang == "am"
-      else "📋 View Program Details (FAQ)"
-  )
-
-  if lang == "am":
-    if loc_type == "et":
-      keyboard = [
-          [
-              InlineKeyboardButton(
-                  faq_btn_text, callback_data=f"faq_{loc_type}"
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥗 የምግብ እቅድ ብቻ — 799 ETB",
-                  callback_data="dur_Meal_Plan_Only_799ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥉 ፈጣን ጅማሬ (21 ቀናት) — 3,500 ETB",
-                  callback_data="dur_Kickstart_(21_Days)_3500ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥈 የሰውነት ለውጥ (60 ቀናት) — 7,000 ETB",
-                  callback_data="dur_Transformation_(60_Days)_7000ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥇 Elite (90 ቀናት) — 9,500 ETB",
-                  callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "💎 Lifestyle (6 ወራት) — 18,000 ETB",
-                  callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "👑 ቪአይፒ (6 ወራት) — 30,000 ETB",
-                  callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
-              )
-          ],
-      ]
-    else:
-      keyboard = [
-          [
-              InlineKeyboardButton(
-                  faq_btn_text, callback_data=f"faq_{loc_type}"
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥗 የምግብ እቅድ ብቻ — $29.99",
-                  callback_data="dur_Meal_Plan_Only_$29.99",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥉 ፈጣን ጅማሬ (21 ቀናት) — $35",
-                  callback_data="dur_Kickstart_(21_Days)_$35",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥈 የሰውነት ለውጥ (60 ቀናት) — $89",
-                  callback_data="dur_Transformation_(60_Days)_$89",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥇 Elite (90 ቀናት) — $129",
-                  callback_data="dur_Elite_Transformation_(90_Days)_$129",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "💎 Lifestyle (6 ወራት) — $249",
-                  callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "👑 ቪአይፒ (6 ወራት) — $449",
-                  callback_data="dur_VIP_Coaching_(6_Months)_$449",
-              )
-          ],
-      ]
-  else:
-    if loc_type == "et":
-      keyboard = [
-          [
-              InlineKeyboardButton(
-                  faq_btn_text, callback_data=f"faq_{loc_type}"
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥗 Meal Plan Only — 799 ETB",
-                  callback_data="dur_Meal_Plan_Only_799ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥉 Kickstart (21 Days) — 3,500 ETB",
-                  callback_data="dur_Kickstart_(21_Days)_3500ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥈 Transformation (60 Days) — 7,000 ETB",
-                  callback_data="dur_Transformation_(60_Days)_7000ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥇 Elite (90 Days) — 9,500 ETB",
-                  callback_data="dur_Elite_Transformation_(90_Days)_9500ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "💎 Lifestyle (6 Months) — 18,000 ETB",
-                  callback_data="dur_Lifestyle_Coaching_(6_Months)_18000ETB",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "👑 VIP (6 Months) — 30,000 ETB",
-                  callback_data="dur_VIP_Coaching_(6_Months)_30000ETB",
-              )
-          ],
-      ]
-    else:
-      keyboard = [
-          [
-              InlineKeyboardButton(
-                  faq_btn_text, callback_data=f"faq_{loc_type}"
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥗 Meal Plan Only — $29.99",
-                  callback_data="dur_Meal_Plan_Only_$29.99",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥉 Kickstart (21 Days) — $35",
-                  callback_data="dur_Kickstart_(21_Days)_$35",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥈 Transformation (60 Days) — $89",
-                  callback_data="dur_Transformation_(60_Days)_$89",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "🥇 Elite (90 Days) — $129",
-                  callback_data="dur_Elite_Transformation_(90_Days)_$129",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "💎 Lifestyle (6 Months) — $249",
-                  callback_data="dur_Lifestyle_Coaching_(6_Months)_$249",
-              )
-          ],
-          [
-              InlineKeyboardButton(
-                  "👑 VIP (6 Months) — $449",
-                  callback_data="dur_VIP_Coaching_(6_Months)_$449",
-              )
-          ],
-      ]
+  keyboard = get_pricing_keyboard(lang, loc_type)
 
   text = (
       "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n"
@@ -1161,8 +1174,10 @@ def main():
       .build()
   )
 
-  app.add_handler(CommandHandler("faq", faq_command))
   app.add_handler(CallbackQueryHandler(faq_callback, pattern="^faq_"))
+  app.add_handler(
+      CallbackQueryHandler(back_to_pricing_callback, pattern="^back_pricing_")
+  )
 
   conv_handler = ConversationHandler(
       entry_points=[CommandHandler("start", start)],
