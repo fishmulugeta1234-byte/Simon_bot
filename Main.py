@@ -61,12 +61,13 @@ CREDENTIALS_FILE = "credentials.json"
 (
     POST_ACTIVITY,
     POST_EXPERIENCE,
+    POST_EQUIPMENT,
     POST_OBSTACLE,
     POST_READINESS,
     POST_HEALTH,
     POST_DIET,
     POST_EATING_STYLE,
-) = range(10, 17)
+) = range(10, 18)
 
 
 # ==========================================
@@ -127,6 +128,7 @@ def save_lead_to_google_sheet(user_data, user):
         user_data.get("goal", "General"),
         user_data.get("activity", "Unknown"),
         user_data.get("experience", "Unknown"),
+        user_data.get("equipment", "Unknown"),
         user_data.get("obstacle", "Unknown"),
         (
             int(user_data.get("readiness", 0))
@@ -753,7 +755,7 @@ async def goal_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
   query = update.callback_query
   await query.answer()
 
-  goal = query.data.split("_")[1]
+  goal = "_".join(query.data.split("_")[1:])
   context.user_data["goal"] = goal
   lang = context.user_data.get("lang", "am")
 
@@ -1065,6 +1067,51 @@ async def post_experience_choice(
   keyboard = [
       [
           InlineKeyboardButton(
+              "🏠 በቤት ውስጥ (መሳሪያ የለም)"
+              if lang == "am"
+              else "🏠 Home (No Equipment)",
+              callback_data="peqp_home_none",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "🏡 በቤት ውስጥ (አነስተኛ መሳሪያ አለኝ)"
+              if lang == "am"
+              else "🏡 Home (Some Equipment)",
+              callback_data="peqp_home_some",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "🏋️ ወደ ጂም እሄዳለሁ" if lang == "am" else "🏋️ I Go to a Gym",
+              callback_data="peqp_gym",
+          )
+      ],
+  ]
+  reply_markup = InlineKeyboardMarkup(keyboard)
+
+  text = (
+      "🏋️ <b>የስፖርት መሳሪያ አለዎት ወይስ ወደ ጂም ይሄዳሉ?</b>"
+      if lang == "am"
+      else "🏋️ <b>Do you have workout equipment, or do you go to a gym?</b>"
+  )
+  await query.edit_message_text(text, reply_markup=reply_markup, parse_mode="HTML")
+  return POST_EQUIPMENT
+
+
+async def post_equipment_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+
+  equipment = "_".join(query.data.split("_")[1:])
+  context.user_data["equipment"] = equipment
+  lang = context.user_data.get("lang", "am")
+
+  keyboard = [
+      [
+          InlineKeyboardButton(
               "🍱 የምግብ ሥርዓት አለመጠበቅ"
               if lang == "am"
               else "🍱 Bad Diet & Nutrition",
@@ -1256,6 +1303,7 @@ async def post_eating_style_choice(
       f"• <b>Goal:</b> {context.user_data.get('goal')}\n"
       f"• <b>Activity Level:</b> {context.user_data.get('activity')}\n"
       f"• <b>Experience:</b> {context.user_data.get('experience')}\n"
+      f"• <b>Equipment/Location:</b> {context.user_data.get('equipment')}\n"
       f"• <b>Main Obstacle:</b> {context.user_data.get('obstacle')}\n"
       f"• <b>Readiness (1-10):</b> {context.user_data.get('readiness')}\n"
       f"• <b>Injuries/Health:</b> {context.user_data.get('injuries')}\n"
@@ -1392,6 +1440,9 @@ def main():
           ],
           POST_EXPERIENCE: [
               CallbackQueryHandler(post_experience_choice, pattern="^pexp_")
+          ],
+          POST_EQUIPMENT: [
+              CallbackQueryHandler(post_equipment_choice, pattern="^peqp_")
           ],
           POST_OBSTACLE: [
               CallbackQueryHandler(post_obstacle_choice, pattern="^pobs_")
