@@ -35,6 +35,10 @@ TELEBIRR_NUMBER = "0939998090"
 ACCOUNT_NAME = "Simon mulugeta"
 SUPPORT_HANDLE = "@s_simon_19"
 
+# Reminder for incomplete assessments (in seconds) — nudges inactive users
+# Requires: pip install "python-telegram-bot[job-queue]"
+REMINDER_DELAY_SECONDS = 3 * 60 * 60  # 3 hours
+
 # Google Sheets Configuration
 GOOGLE_SHEET_NAME = "Fitness Clients"
 CREDENTIALS_FILE = "credentials.json"
@@ -61,7 +65,8 @@ CREDENTIALS_FILE = "credentials.json"
     POST_READINESS,
     POST_HEALTH,
     POST_DIET,
-) = range(10, 16)
+    POST_EATING_STYLE,
+) = range(10, 17)
 
 
 # ==========================================
@@ -130,12 +135,87 @@ def save_lead_to_google_sheet(user_data, user):
         ),
         user_data.get("injuries", "None"),
         user_data.get("diet", "None"),
+        user_data.get("eating_style", "Unknown"),
     ]
 
     sheet.append_row(row_data)
     logging.info("Successfully saved client and timestamp to Google Sheet!")
   except Exception as e:
     logging.error(f"Exception while saving to Google Sheet: {e}")
+
+
+# ==========================================
+# ⏰ INCOMPLETE ASSESSMENT REMINDERS
+# ==========================================
+def _reminder_job_name(prefix, chat_id):
+  return f"{prefix}_{chat_id}"
+
+
+def schedule_reminder(context: ContextTypes.DEFAULT_TYPE, prefix, chat_id, lang):
+  if context.job_queue is None:
+    return
+  job_name = _reminder_job_name(prefix, chat_id)
+  for job in context.job_queue.get_jobs_by_name(job_name):
+    job.schedule_removal()
+  callback = (
+      send_onboarding_reminder
+      if prefix == "onboarding_reminder"
+      else send_assessment_reminder
+  )
+  context.job_queue.run_repeating(
+      callback,
+      interval=REMINDER_DELAY_SECONDS,
+      first=REMINDER_DELAY_SECONDS,
+      chat_id=chat_id,
+      name=job_name,
+      data={"lang": lang},
+  )
+
+
+def cancel_reminder(context: ContextTypes.DEFAULT_TYPE, prefix, chat_id):
+  if context.job_queue is None:
+    return
+  job_name = _reminder_job_name(prefix, chat_id)
+  for job in context.job_queue.get_jobs_by_name(job_name):
+    job.schedule_removal()
+
+
+async def send_onboarding_reminder(context: ContextTypes.DEFAULT_TYPE):
+  job = context.job
+  lang = (job.data or {}).get("lang", "am")
+  text = (
+      "👋 <b>ገና አልጨረሱም!</b>\n\nምዝገባዎን ገና አላጠናቀቁም። ከላይ ላለው ጥያቄ በመመለስ ይቀጥሉ፣ ወይም"
+      " ከመጀመሪያ ለመጀመር /start ይላኩ።"
+      if lang == "am"
+      else (
+          "👋 <b>Still with us?</b>\n\nYou started registering but haven't"
+          " finished yet. Reply to my last question above to continue, or"
+          " send /start to begin again."
+      )
+  )
+  try:
+    await context.bot.send_message(chat_id=job.chat_id, text=text, parse_mode="HTML")
+  except Exception as e:
+    logging.error(f"Failed to send onboarding reminder to {job.chat_id}: {e}")
+
+
+async def send_assessment_reminder(context: ContextTypes.DEFAULT_TYPE):
+  job = context.job
+  lang = (job.data or {}).get("lang", "am")
+  text = (
+      "👋 <b>ገና ጥቂት ጥያቄዎች ይቀሩዎታል!</b>\n\nክፍያዎ ጸድቋል፣ ነገር ግን የግምገማ ጥያቄዎቹን ገና"
+      " አላጠናቀቁም። ከላይ ላለው ጥያቄ በመመለስ ዕቅድዎ እንዲዘጋጅ ይርዱን!"
+      if lang == "am"
+      else (
+          "👋 <b>A few questions left!</b>\n\nYour payment is approved, but"
+          " you haven't finished the quick assessment yet. Answer my last"
+          " question above so we can start building your plan!"
+      )
+  )
+  try:
+    await context.bot.send_message(chat_id=job.chat_id, text=text, parse_mode="HTML")
+  except Exception as e:
+    logging.error(f"Failed to send assessment reminder to {job.chat_id}: {e}")
 
 
 # ==========================================
@@ -413,6 +493,8 @@ async def back_to_pricing_callback(
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
   user = update.effective_user
   context.user_data.clear()
+  cancel_reminder(context, "onboarding_reminder", user.id)
+  cancel_reminder(context, "assessment_reminder", user.id)
 
   admin_log_msg = (
       f"🚨 <b>NEW LEAD STARTED BOT!</b>\n"
@@ -454,6 +536,7 @@ async def language_choice(
 
   lang = query.data.split("_")[1]
   context.user_data["lang"] = lang
+  schedule_reminder(context, "onboarding_reminder", update.effective_user.id, lang)
 
   keyboard = [
       [
@@ -851,6 +934,8 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     except Exception as e:
       logging.error(f"Failed to send receipt to admin {admin_id}: {e}")
 
+  cancel_reminder(context, "onboarding_reminder", user.id)
+
   if lang == "am":
     wait_msg = (
         "⏳ <b>የክፍያ ደረሰኝዎ ደርሶናል!</b>\n\nሳይመን ክፍያዎን እስኪያረጋግጥ እባክዎ ትንሽ"
@@ -876,6 +961,7 @@ async def resume_assessment(
   query = update.callback_query
   await query.answer()
   lang = context.user_data.get("lang", "am")
+  schedule_reminder(context, "assessment_reminder", update.effective_user.id, lang)
 
   if lang == "am":
     text = "🏃 <b>ዕለታዊ እንቅስቃሴዎ ምን ይመስላል?</b>"
@@ -1097,10 +1183,59 @@ async def post_health_input(
 async def post_diet_input(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> int:
-  user = update.effective_user
   lang = context.user_data.get("lang", "am")
   context.user_data["diet"] = update.message.text.strip()
 
+  keyboard = [
+      [
+          InlineKeyboardButton(
+              "🍳 በቤት አበስላለሁ" if lang == "am" else "🍳 Cook at home",
+              callback_data="peat_home",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "🍽️ ብዙ ጊዜ ውጭ እበላለሁ" if lang == "am" else "🍽️ Mostly eat out",
+              callback_data="peat_out",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "🔄 ሁለቱንም እቀላቅላለሁ" if lang == "am" else "🔄 Mix of both",
+              callback_data="peat_mix",
+          )
+      ],
+      [
+          InlineKeyboardButton(
+              "⏱️ ለማብሰል ጊዜ የለኝም" if lang == "am" else "⏱️ No time to cook",
+              callback_data="peat_notime",
+          )
+      ],
+  ]
+  reply_markup = InlineKeyboardMarkup(keyboard)
+
+  text = (
+      "🍽️ <b>እንዴት ነው በተለምዶ የሚመገቡት?</b>"
+      if lang == "am"
+      else "🍽️ <b>How do you usually eat?</b>"
+  )
+  await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="HTML")
+  return POST_EATING_STYLE
+
+
+async def post_eating_style_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+  query = update.callback_query
+  await query.answer()
+
+  eating_style = query.data.split("_")[1]
+  context.user_data["eating_style"] = eating_style
+
+  user = update.effective_user
+  lang = context.user_data.get("lang", "am")
+
+  cancel_reminder(context, "assessment_reminder", user.id)
   save_lead_to_google_sheet(context.user_data, user)
 
   # Send complete assessment summary to admins after questionnaire is finished
@@ -1124,7 +1259,8 @@ async def post_diet_input(
       f"• <b>Main Obstacle:</b> {context.user_data.get('obstacle')}\n"
       f"• <b>Readiness (1-10):</b> {context.user_data.get('readiness')}\n"
       f"• <b>Injuries/Health:</b> {context.user_data.get('injuries')}\n"
-      f"• <b>Dietary Notes:</b> {context.user_data.get('diet')}"
+      f"• <b>Dietary Notes:</b> {context.user_data.get('diet')}\n"
+      f"• <b>Eating Style:</b> {context.user_data.get('eating_style')}"
   )
 
   for admin_id in ADMIN_USER_IDS:
@@ -1156,7 +1292,7 @@ async def post_diet_input(
         "💪 <i>Let's build something amazing together!</i>"
     )
 
-  await update.message.reply_text(confirm_msg, parse_mode="HTML")
+  await query.edit_message_text(confirm_msg, parse_mode="HTML")
   return ConversationHandler.END
 
 
@@ -1268,6 +1404,9 @@ def main():
           ],
           POST_DIET: [
               MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)
+          ],
+          POST_EATING_STYLE: [
+              CallbackQueryHandler(post_eating_style_choice, pattern="^peat_")
           ],
       },
       fallbacks=[],
