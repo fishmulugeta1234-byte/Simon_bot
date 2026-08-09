@@ -808,8 +808,8 @@ async def duration_choice(
     )
   else:
     dur_info = data.split("_")[1:]
-    duration_str = dur_info[0]
-    price_str = dur_info[1]
+    price_str = dur_info[-1]
+    duration_str = " ".join(dur_info[:-1])
 
   context.user_data["duration"] = duration_str
   context.user_data["price"] = price_str
