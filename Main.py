@@ -145,7 +145,7 @@ def get_faq_text(loc):
   if loc == "et":
     return (
         "📋 <b>የፕሮግራሞች ዝርዝር መግለጫ (FAQ)</b>\n\n"
-        "• <b>የምግብ እቅድ ብቻ (799 ETB):</b> ለእርስዎ ግብ እና አካል የተዘጋጀ ብጁ የምግብ ዝግጅት"
+        "• <b>የምግብ እቅድ ብቻ (799 ETB):</b> ለእርስዎ ግብ እና አካል የተዘጋጀ የምግብ ዝግጅት"
         " እቅድ ብቻ።\n\n"
         "• <b>ፈጣን ጅማሬ / 21 ቀናት (3,500 ETB):</b> ለጀማሪዎች ፍጹም ነው። ቋሚ የስፖርት ዕቅድ፣"
         " 1 የምግብ ዕቅድ፣ 1 ማስተካከያ እና 3 ክትትሎችን ያካትታል።\n\n"
@@ -527,12 +527,12 @@ async def location_choice(
 
   if lang == "am":
     teaser_msg = (
-        "⏳ <b>በግምት በ3 ደቂቃ ውስጥ የእርስዎን ብጁ (Custom) ዕቅድ እናዘጋጃለን —"
+        "⏳ <b>በግምት በ3 ደቂቃ ውስጥ የእርስዎን ዕቅድ እናዘጋጃለን —"
         " እናስጀምር!</b>"
     )
   else:
     teaser_msg = (
-        "⏳ <b>In about 3 minutes I'll put together your custom plan — let's"
+        "⏳ <b>In about 3 minutes I'll put together your plan — let's"
         " get started!</b>"
     )
 
@@ -1091,11 +1091,43 @@ async def post_diet_input(
 
   save_lead_to_google_sheet(context.user_data, user)
 
+  # Send complete assessment summary to admins after questionnaire is finished
+  completion_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
+  admin_completion_card = (
+      f"🚀 <b>CLIENT COMPLETED FULL ASSESSMENT!</b>\n"
+      f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+      f"👤 <b>Client:</b> {user.full_name} (@{user.username or 'No_Username'})\n"
+      f"📞 <b>Phone:</b> {context.user_data.get('phone')}\n"
+      f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
+      f"📅 <b>Completed At:</b> {completion_timestamp}\n"
+      f"🌐 <b>Language:</b> {'Amharic' if lang == 'am' else 'English'}\n"
+      f"📍 <b>Location:</b> {'Ethiopia' if context.user_data.get('location_type') == 'et' else 'Diaspora'}\n"
+      f"⏱️ <b>Program:</b> {context.user_data.get('duration')} ({context.user_data.get('price')})\n\n"
+      f"📊 <b>Full Body & Fitness Profile:</b>\n"
+      f"• <b>Gender:</b> {context.user_data.get('gender')} | <b>Age:</b> {context.user_data.get('age')} yrs\n"
+      f"• <b>Height:</b> {context.user_data.get('height')} cm | <b>Weight:</b> {context.user_data.get('weight')} kg\n"
+      f"• <b>Goal:</b> {context.user_data.get('goal')}\n"
+      f"• <b>Activity Level:</b> {context.user_data.get('activity')}\n"
+      f"• <b>Experience:</b> {context.user_data.get('experience')}\n"
+      f"• <b>Main Obstacle:</b> {context.user_data.get('obstacle')}\n"
+      f"• <b>Readiness (1-10):</b> {context.user_data.get('readiness')}\n"
+      f"• <b>Injuries/Health:</b> {context.user_data.get('injuries')}\n"
+      f"• <b>Dietary Notes:</b> {context.user_data.get('diet')}"
+  )
+
+  for admin_id in ADMIN_USER_IDS:
+    try:
+      await context.bot.send_message(
+          chat_id=admin_id, text=admin_completion_card, parse_mode="HTML"
+      )
+    except Exception as e:
+      logging.error(f"Failed to send completion summary to admin {admin_id}: {e}")
+
   if lang == "am":
     confirm_msg = (
         "🎉 <b>እንኳን ደስ አለዎት! መረጃዎ ሙሉ በሙሉ ተመዝግቧል!</b>\n\n"
         "📋 <b>ቀጣይ እርምጃችን ምን ይሆናል?</b>\n"
-        "• ሳይመን ያስገቡትን ሙሉ መረጃ በመጠቀም ብጁ (Custom) ዕቅድዎን አሁን ማዘጋጀት"
+        "• ሳይመን ያስገቡትን ሙሉ መረጃ በመጠቀም ዕቅድዎን አሁን ማዘጋጀት"
         " ጀምሯል።\n"
         "• የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b> እዚሁ ቻት"
         " ላይ ይላክልዎታል።\n\n"
@@ -1131,7 +1163,7 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
         chat_id=client_id,
         text=(
             "✅ <b>Payment Approved by Simon!</b> Click below to finish your"
-            " remaining quick questions so we can build your custom plan:"
+            " remaining quick questions so we can build your plan:"
         ),
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton(
