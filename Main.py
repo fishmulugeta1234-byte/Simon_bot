@@ -42,6 +42,7 @@ CBE_ACCOUNT = "1000357796532"
 TELEBIRR_NUMBER = "0939998090"
 ACCOUNT_NAME = "Simon mulugeta"
 SUPPORT_HANDLE = "@s_simon_19"
+BOT_2_LINK = "https://t.me/Simonoriginbot"
 
 # Reminder Delays (in seconds)
 REMINDER_DELAY_SECONDS = 3 * 60 * 60       # 3 hours for standard steps
@@ -818,19 +819,22 @@ async def post_eating_style_choice(update: Update, context: ContextTypes.DEFAULT
             "🎉 <b>እንኳን ደስ አለዎት! መረጃዎ ሙሉ በሙሉ ተመዝግቧል!</b>\n\n"
             "📋 <b>ቀጣይ እርምጃችን ምን ይሆናል?</b>\n"
             "• ሳይመን ያስገቡትን ሙሉ መረጃ በመጠቀም ዕቅድዎን አሁን ማዘጋጀት ጀምሯል።\n"
-            "• የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b> እዚሁ ቻት ላይ ይላክልዎታል።\n\n"
-            "💪 <i>አብረን አስደናቂ ለውጥ እናመጣለን!</i>"
+            "• የተዘጋጀውን የሥልጠና እና የምግብ ፕሮግራምዎን <b>በ24 ሰዓታት ውስጥ</b> በክትትል ቦታችን በኩል ይላክልዎታል።\n\n"
+            "👇 <i>እባክዎ ቀጣይ ሂደቱን ለመከታተል የእኛን የክትትል ቦት (Bot 2) ይቀላቀሉ!</i>"
         )
     else:
         confirm_msg = (
             "🎉 <b>Assessment Successfully Completed!</b>\n\n"
             "📋 <b>Next Steps:</b>\n"
             "• Simon is now building your fully customized training and nutrition plan based on your full assessment.\n"
-            "• You will receive your complete plan <b>within 24 hours</b> directly in this chat.\n\n"
-            "💪 <i>Let's build something amazing together!</i>"
+            "• You will receive your complete plan <b>within 24 hours</b> via our tracking portal.\n\n"
+            "👇 <i>Please tap the button below to join your tracking bot (Bot 2)!</i>"
         )
 
-    await query.edit_message_text(confirm_msg, parse_mode="HTML")
+    bot2_button_text = "🤖 የክትትል ቦት ክፈት (Open Tracking Bot)" if lang == "am" else "🤖 Open Tracking Bot (Bot 2)"
+    reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(bot2_button_text, url=BOT_2_LINK)]])
+
+    await query.edit_message_text(confirm_msg, reply_markup=reply_markup, parse_mode="HTML")
     return ConversationHandler.END
 
 
@@ -915,7 +919,7 @@ def main():
             POST_EXPERIENCE: [CallbackQueryHandler(post_experience_choice, pattern="^pexp_")],
             POST_EQUIPMENT: [CallbackQueryHandler(post_equipment_choice, pattern="^peqp_")],
             POST_OBSTACLE: [CallbackQueryHandler(post_obstacle_choice, pattern="^pobs_")],
-            POST_READINESS: [CallbackQueryHandler(post_readiness_choice, pattern="^pread_")],
+            POST_READINESS: [CallbackQueryHandler(post_readINESS_choice := post_readiness_choice, pattern="^pread_")],
             POST_HEALTH: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_health_input)],
             POST_DIET: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)],
             POST_EATING_STYLE: [CallbackQueryHandler(post_eating_style_choice, pattern="^peat_")],
