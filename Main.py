@@ -1,7 +1,7 @@
 import logging
 import os
+import re
 import threading
-from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from supabase import create_client, Client
@@ -17,10 +17,14 @@ from telegram.ext import (
     filters,
 )
 
+# Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
+# ==========================================
+# ⚙️ CONFIGURATION & CONSTANTS
+# ==========================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -39,10 +43,16 @@ ACCOUNT_NAME = "Simon mulugeta"
 SUPPORT_HANDLE = "@s_simon_19"
 BOT_2_LINK = "https://t.me/Simonoriginbot"
 
+# UI Image Graphics
+GENDER_PHOTO_ID = "AgACAgQAAxkBAAFRqwFqfKwio4y4NyZrB_8NyBiuI-tRwgAC6xBrG49R6VNBWlDO5BA76gEAAwIAA3kAAz0E"
+BIOMETRICS_PHOTO_ID = "AgACAgQAAxkBAAFRqvFqfKuTupRfry280QYNS3V5LpzljwAC6hBrG49R6VM5n2ngFLTqRAEAAwIAA3kAAz0E"
+
 REMINDER_DELAY_SECONDS = 3 * 60 * 60
 PAYMENT_REMINDER_DELAY = 2 * 60 * 60
 
-# Full State Machine
+# ==========================================
+# 📋 CONVERSATION STATES
+# ==========================================
 (
     LANGUAGE,
     GENDER,
@@ -65,6 +75,9 @@ PAYMENT_REMINDER_DELAY = 2 * 60 * 60
 ) = range(18)
 
 
+# ==========================================
+# 🌐 WEB SERVER FOR RENDER KEEP-ALIVE
+# ==========================================
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -76,39 +89,32 @@ def run_web_server():
     server.serve_forever()
 
 
+# ==========================================
+# 🗄️ SUPABASE SYNC HELPERS
+# ==========================================
 def save_lead_to_supabase(user_data, user):
     try:
         data = {
             "id": int(user.id),
             "full_name": user.full_name,
             "username": user.username or "None",
-            "phone": user_data.get("phone", ""),
-            "location_type": "Ethiopia" if user_data.get("location_type") == "et" else "Diaspora",
-            "package": user_data.get("duration", ""),
-            "price": user_data.get("price", ""),
-            "payment_status": "Pending_Approval",
-            "gender": user_data.get("gender", "Unknown"),
-            "age": int(user_data.get("age", 0)) if user_data.get("age") else 0,
-            "height": int(user_data.get("height", 0)) if user_data.get("height") else 0,
-            "weight": int(user_data.get("weight", 0)) if user_data.get("weight") else 0,
+            "phone_number": user_data.get("phone", ""),
             "goal": user_data.get("goal", "General"),
-            "activity": user_data.get("activity", "Unknown"),
-            "experience": user_data.get("experience", "Unknown"),
-            "equipment": user_data.get("equipment", "Unknown"),
-            "obstacle": user_data.get("obstacle", "Unknown"),
-            "readiness": int(user_data.get("readiness", 0)) if user_data.get("readiness") else 0,
-            "injuries": user_data.get("injuries", "None"),
-            "diet": user_data.get("diet", "None"),
-            "eating_style": user_data.get("eating_style", "Unknown"),
+            "language": user_data.get("lang", "am"),
+            "package": user_data.get("duration", ""),
             "is_active": False,
-            "language": user_data.get("lang", "am")
+            "baseline_weight": float(user_data.get("weight", 0)) if user_data.get("weight") else 0.0,
+            "updated_at": "now()"
         }
         supabase.table("clients").upsert(data).execute()
-        logging.info("Successfully saved client assessment to Supabase!")
+        logging.info("Successfully saved client core profile to Supabase!")
     except Exception as e:
         logging.error(f"Exception while saving to Supabase: {e}")
 
 
+# ==========================================
+# ⏰ REMINDERS & RECOVERY JOBS
+# ==========================================
 def _reminder_job_name(prefix, chat_id):
     return f"{prefix}_{chat_id}"
 
@@ -147,6 +153,9 @@ async def send_assessment_reminder(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e: logging.error(e)
 
 
+# ==========================================
+# 📋 PRICING & FAQ HELPERS
+# ==========================================
 def get_faq_text(loc):
     if loc == "et":
         return (
@@ -173,6 +182,7 @@ def get_faq_text(loc):
 
 def get_pricing_keyboard(lang, loc_type):
     faq_btn_text = "📋 የፕሮግራም ዝርዝር ማየት (FAQ)" if lang == "am" else "📋 View Program Details (FAQ)"
+    back_btn_text = "🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back"
     if lang == "am":
         if loc_type == "et":
             return [
@@ -183,6 +193,7 @@ def get_pricing_keyboard(lang, loc_type):
                 [InlineKeyboardButton("🥇 Elite (90 ቀናት) — 12,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_12500ETB")],
                 [InlineKeyboardButton("💎 Lifestyle (6 ወራት) — 24,000 ETB", callback_data="dur_Lifestyle_Coaching_(6_Months)_24000ETB")],
                 [InlineKeyboardButton("👑 ቪአይፒ (6 ወራት) — 39,000 ETB", callback_data="dur_VIP_Coaching_(6_Months)_39000ETB")],
+                [InlineKeyboardButton(back_btn_text, callback_data="nav_back_phone")],
             ]
         else:
             return [
@@ -193,6 +204,7 @@ def get_pricing_keyboard(lang, loc_type):
                 [InlineKeyboardButton("🥇 Elite (90 Days) — $159", callback_data="dur_Elite_Transformation_(90_Days)_$159")],
                 [InlineKeyboardButton("💎 Lifestyle (6 Months) — $299", callback_data="dur_Lifestyle_Coaching_(6_Months)_$299")],
                 [InlineKeyboardButton("👑 VIP (6 Months) — $549", callback_data="dur_VIP_Coaching_(6_Months)_$549")],
+                [InlineKeyboardButton(back_btn_text, callback_data="nav_back_phone")],
             ]
     else:
         if loc_type == "et":
@@ -204,6 +216,7 @@ def get_pricing_keyboard(lang, loc_type):
                 [InlineKeyboardButton("🥇 Elite (90 Days) — 12,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_12500ETB")],
                 [InlineKeyboardButton("💎 Lifestyle (6 Months) — 24,000 ETB", callback_data="dur_Lifestyle_Coaching_(6_Months)_24000ETB")],
                 [InlineKeyboardButton("👑 VIP (6 Months) — 39,000 ETB", callback_data="dur_VIP_Coaching_(6_Months)_39000ETB")],
+                [InlineKeyboardButton(back_btn_text, callback_data="nav_back_phone")],
             ]
         else:
             return [
@@ -214,6 +227,7 @@ def get_pricing_keyboard(lang, loc_type):
                 [InlineKeyboardButton("🥇 Elite (90 Days) — $159", callback_data="dur_Elite_Transformation_(90_Days)_$159")],
                 [InlineKeyboardButton("💎 Lifestyle (6 Months) — $299", callback_data="dur_Lifestyle_Coaching_(6_Months)_$299")],
                 [InlineKeyboardButton("👑 VIP (6 Months) — $549", callback_data="dur_VIP_Coaching_(6_Months)_$549")],
+                [InlineKeyboardButton(back_btn_text, callback_data="nav_back_phone")],
             ]
 
 async def faq_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -223,7 +237,7 @@ async def faq_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = context.user_data.get("lang", "am")
     text = get_faq_text(loc)
     back_text = "🔙 ወደ ዋጋዎች መመለስ" if lang == "am" else "🔙 Back to Pricing"
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_text, callback_data=f"back_pricing_{loc}")]]), parse_mode="HTML")
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_text, callback_data=f"back_pricing_{loc}")] ]), parse_mode="HTML")
 
 async def back_to_pricing_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -234,6 +248,10 @@ async def back_to_pricing_callback(update: Update, context: ContextTypes.DEFAULT
     text = "⏱️ <b>የፕሮግራም ቆይታ ይምረጡ፦</b>" if lang == "am" else "⏱️ <b>Select your transformation timeframe:</b>"
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
+
+# ==========================================
+# 🚀 STEP-BY-STEP FLOW HANDLERS
+# ==========================================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     context.user_data.clear()
@@ -251,18 +269,38 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     lang = query.data.split("_")[1]
     context.user_data["lang"] = lang
     schedule_reminder(context, "onboarding_reminder", update.effective_user.id, lang)
-    keyboard = [[InlineKeyboardButton("👨 ወንድ" if lang == "am" else "👨 Male", callback_data="gen_male"), InlineKeyboardButton("👩 ሴት" if lang == "am" else "👩 Female", callback_data="gen_female")]]
-    await query.edit_message_text("👤 <b>ጾታዎን ይምረጡ፦</b>" if lang == "am" else "👤 <b>Select your gender:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+    keyboard = [
+        [InlineKeyboardButton("👨 ወንድ" if lang == "am" else "👨 Male", callback_data="gen_male"), InlineKeyboardButton("👩 ሴት" if lang == "am" else "👩 Female", callback_data="gen_female")]
+    ]
+    
+    # Send photo for Gender choice
+    await query.message.reply_photo(
+        photo=GENDER_PHOTO_ID,
+        caption="👤 <b>ጾታዎን ይምረጡ፦</b>" if lang == "am" else "👤 <b>Select your gender:</b>",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="HTML"
+    )
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     return GENDER
 
 async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    
+    if query.data == "nav_back_lang":
+        keyboard = [[InlineKeyboardButton("🇺🇸 English", callback_data="lang_en"), InlineKeyboardButton("🇪🇹 አማርኛ", callback_data="lang_am")]]
+        await query.edit_message_text("Welcome! Please select your language / ቋንቋ ይምረጡ፦", reply_markup=InlineKeyboardMarkup(keyboard))
+        return LANGUAGE
+
     context.user_data["gender"] = query.data.split("_")[1]
     lang = context.user_data.get("lang", "am")
     keyboard = [
         [InlineKeyboardButton("🇪🇹 ኢትዮጵያ (በሀገር ውስጥ)", callback_data="loc_et")],
-        [InlineKeyboardButton("🌍 ከሀገር ውጭ (Diaspora)", callback_data="loc_diaspora")]
+        [InlineKeyboardButton("🌍 ከሀገር ውጭ (Diaspora)", callback_data="loc_diaspora")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_lang")]
     ]
     await query.edit_message_text("📍 <b>እባክዎ የሚኖሩበትን አካባቢ ይምረጡ፦</b>" if lang == "am" else "📍 <b>Select your region:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return LOCATION
@@ -270,29 +308,97 @@ async def gender_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    
+    if query.data == "nav_back_gender":
+        lang = context.user_data.get("lang", "am")
+        keyboard = [
+            [InlineKeyboardButton("👨 ወንድ" if lang == "am" else "👨 Male", callback_data="gen_male"), InlineKeyboardButton("👩 ሴት" if lang == "am" else "👩 Female", callback_data="gen_female")]
+        ]
+        await query.message.reply_photo(
+            photo=GENDER_PHOTO_ID,
+            caption="👤 <b>ጾታዎን ይምረጡ፦</b>" if lang == "am" else "👤 <b>Select your gender:</b>",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        return GENDER
+
     context.user_data["location_type"] = query.data.split("_")[1]
     lang = context.user_data.get("lang", "am")
-    await query.edit_message_text("⏳ <b>እቅድዎን እያዘጋጀን ነው... እባክዎ ዕድሜዎን ይጻፉ (ምሳሌ፡ 25)፦</b>" if lang == "am" else "⏳ <b>Please enter your age (e.g., 25):</b>", parse_mode="HTML")
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_gender")]])
+    
+    # Send image with Age prompt
+    await query.message.reply_photo(
+        photo=BIOMETRICS_PHOTO_ID,
+        caption="⏳ <b>እቅድዎን እያዘጋጀን ነው... እባክዎ ዕድሜዎን በቁጥር ይጻፉ (ምሳሌ፡ 25)፦</b>" if lang == "am" else "⏳ <b>Please enter your age as a number (e.g., 25):</b>",
+        reply_markup=back_kb,
+        parse_mode="HTML"
+    )
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
     return AGE
 
 async def age_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["age"] = update.message.text.strip()
     lang = context.user_data.get("lang", "am")
-    await update.message.reply_text("📏 <b>ቁመትዎ በሴንቲሜትር (cm) ስንት ነው?</b>" if lang == "am" else "📏 <b>Height in cm?</b>", parse_mode="HTML")
+    text = update.message.text.strip()
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_gender")]])
+
+    if not text.isdigit() or not (10 <= int(text) <= 120):
+        error_msg = "❌ ይቅርታ፣ ሀሳብዎን በትክክል አልተረዳሁም። እባክዎ ትክክለኛ ዕድሜ በቁጥር ያስገቡ (ምሳሌ፡ 25)፦" if lang == "am" else "❌ I didn't catch that. Please enter a valid age as a number (e.g., 25):"
+        await update.message.reply_photo(photo=BIOMETRICS_PHOTO_ID, caption=error_msg, reply_markup=back_kb)
+        return AGE
+
+    context.user_data["age"] = text
+    back_kb_height = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_age")]])
+    
+    # Text-only for height as requested
+    await update.message.reply_text(
+        "📏 <b>ቁመትዎ በሴንቲሜትር (cm) ስንት ነው? (ምሳሌ፡ 175)</b>" if lang == "am" else "📏 <b>Height in cm? (e.g., 175)</b>",
+        reply_markup=back_kb_height,
+        parse_mode="HTML"
+    )
     return HEIGHT
 
 async def height_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["height"] = update.message.text.strip()
     lang = context.user_data.get("lang", "am")
-    await update.message.reply_text("⚖️ <b>ክብደትዎ በኪሎግራም (kg) ስንት ነው?</b>" if lang == "am" else "⚖️ <b>Weight in kg?</b>", parse_mode="HTML")
+    text = update.message.text.strip()
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_age")]])
+
+    if not text.isdigit() or not (50 <= int(text) <= 250):
+        error_msg = "❌ ይቅርታ፣ ሀሳብዎን በትክክል አልተረዳሁም። እባክዎ ትክክለኛ ቁመት በሴንቲሜትር በቁጥር ያስገቡ (ምሳሌ፡ 175)፦" if lang == "am" else "❌ I didn't catch that. Please enter a valid height in cm as a number (e.g., 175):"
+        await update.message.reply_text(error_msg, reply_markup=back_kb)
+        return HEIGHT
+
+    context.user_data["height"] = text
+    back_kb_weight = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_height")]])
+    await update.message.reply_photo(
+        photo=BIOMETRICS_PHOTO_ID,
+        caption="⚖️ <b>ክብደትዎ በኪሎግራም (kg) ስንት ነው? (ምሳሌ፡ 75)</b>" if lang == "am" else "⚖️ <b>Weight in kg? (e.g., 75)</b>",
+        reply_markup=back_kb_weight,
+        parse_mode="HTML"
+    )
     return WEIGHT
 
 async def weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["weight"] = update.message.text.strip()
     lang = context.user_data.get("lang", "am")
+    text = update.message.text.strip()
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_height")]])
+
+    if not text.isdigit() or not (20 <= int(text) <= 300):
+        error_msg = "❌ ይቅርታ፣ ሀሳብዎን በትክክል አልተረዳሁም። እባክዎ ትክክለኛ ክብደት በኪሎግራም በቁጥር ያስገቡ (ምሳሌ፡ 75)፦" if lang == "am" else "❌ I didn't catch that. Please enter a valid weight in kg as a number (e.g., 75):"
+        await update.message.reply_photo(photo=BIOMETRICS_PHOTO_ID, caption=error_msg, reply_markup=back_kb)
+        return WEIGHT
+
+    context.user_data["weight"] = text
     keyboard = [
         [InlineKeyboardButton("🔥 ስብ መቀነስ" if lang == "am" else "🔥 Fat Loss", callback_data="goal_fat_loss")],
-        [InlineKeyboardButton("💪 ጡንቻ መገንባት" if lang == "am" else "💪 Muscle", callback_data="goal_muscle")]
+        [InlineKeyboardButton("💪 ጡንቻ መገንባት" if lang == "am" else "💪 Muscle", callback_data="goal_muscle")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_weight")]
     ]
     await update.message.reply_text("🎯 <b>ዋናው ዓላማዎ ምንድን ነው?</b>" if lang == "am" else "🎯 <b>Primary goal?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return GOAL
@@ -300,14 +406,46 @@ async def weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 async def goal_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    context.user_data["goal"] = "_".join(query.data.split("_")[1:])
     lang = context.user_data.get("lang", "am")
-    await query.edit_message_text("📞 <b>ስልክ ቁጥርዎ ስንት ነው? (ምሳሌ፡ 0911223344)</b>" if lang == "am" else "📞 <b>Phone number?</b>", parse_mode="HTML")
+
+    if query.data == "nav_back_weight":
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_height")]])
+        await query.message.reply_photo(
+            photo=BIOMETRICS_PHOTO_ID,
+            caption="⚖️ <b>ክብደትዎ በኪሎግራም (kg) ስንት ነው? (ምሳሌ፡ 75)</b>" if lang == "am" else "⚖️ <b>Weight in kg? (e.g., 75)</b>",
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        return WEIGHT
+
+    context.user_data["goal"] = "_".join(query.data.split("_")[1:])
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_goal")]])
+    
+    phone_prompt = (
+        "📞 <b>ለክፍያ ማረጋገጫ፣ ለዕቅድ ማድረሻ እና ለቀጣይ ክትትል የሚሆን ትክክለኛ የስልክ ቁጥርዎ ያስፈልገናል። እባክዎ ቁጥርዎን ያስገቡ (ምሳሌ፡ 0911223344)፦</b>"
+        if lang == "am"
+        else "📞 <b>We need your phone number for payment confirmation, plan delivery, and follow-up. Please enter your number (e.g., 0911223344):</b>"
+    )
+    await query.edit_message_text(phone_prompt, reply_markup=back_kb, parse_mode="HTML")
     return PHONE
 
 async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["phone"] = update.message.text.strip()
     lang = context.user_data.get("lang", "am")
+    text = update.message.text.strip()
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_goal")]])
+
+    # Phone Guardrail: Must contain at least 9 digits
+    clean_phone = re.sub(r"\D", "", text)
+    if len(clean_phone) < 9:
+        error_msg = "❌ እባክዎ ትክክለኛ የስልክ ቁጥር ያስገቡ (ምሳሌ፡ 0911223344)፦" if lang == "am" else "❌ Please enter a valid phone number (e.g., 0911223344):"
+        await update.message.reply_text(error_msg, reply_markup=back_kb)
+        return PHONE
+
+    context.user_data["phone"] = text
     loc_type = context.user_data.get("location_type", "et")
     keyboard = get_pricing_keyboard(lang, loc_type)
     await update.message.reply_text("⏱️ <b>የፕሮግራም ቆይታ ይምረጡ፦</b>" if lang == "am" else "⏱️ <b>Select your timeframe:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
@@ -316,6 +454,18 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    lang = context.user_data.get("lang", "am")
+    
+    if query.data == "nav_back_phone":
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_goal")]])
+        await query.edit_message_text(
+            "📞 <b>ለክፍያ ማረጋገጫ፣ ለዕቅድ ማድረሻ እና ለቀጣይ ክትትል የሚሆን ትክክለኛ የስልክ ቁጥርዎ ያስፈልገናል። እባክዎ ቁጥርዎን ያስገቡ (ምሳሌ፡ 0911223344)፦</b>"
+            if lang == "am"
+            else "📞 <b>We need your phone number for payment confirmation, plan delivery, and follow-up. Please enter your number (e.g., 0911223344):</b>",
+            reply_markup=back_kb, parse_mode="HTML"
+        )
+        return PHONE
+
     data = query.data
     if "Meal_Plan_Only" in data:
         duration_str = "Meal Plan Only (2 Months)"
@@ -327,11 +477,12 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     context.user_data["duration"] = duration_str
     context.user_data["price"] = price_str
-    lang = context.user_data.get("lang", "am")
     loc_type = context.user_data.get("location_type", "et")
 
     cancel_reminder(context, "onboarding_reminder", update.effective_user.id)
     schedule_reminder(context, "payment_reminder", update.effective_user.id, lang, delay=PAYMENT_REMINDER_DELAY)
+
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_dur")]])
 
     if loc_type == "diaspora":
         pay_text = (
@@ -347,69 +498,192 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code>\n• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n\n"
             f"📸 ክፍያውን ፈጽመው የደረሰኙን ስክሪንሾት ይላኩ!"
         )
-    await query.edit_message_text(pay_text, parse_mode="HTML")
+    await query.edit_message_text(pay_text, reply_markup=back_kb, parse_mode="HTML")
     return RECEIPT
 
 async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
+    lang = context.user_data.get("lang", "am")
+
+    # Guardrail: Ensure they uploaded an image screenshot
+    if not update.message.photo:
+        error_text = "❌ እባክዎ የክፍያዎን የደረሰኝ ስክሪንሾት (Photo) ይላኩ፦" if lang == "am" else "❌ Please send a photo/screenshot of your payment receipt:"
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_dur")]])
+        await update.message.reply_text(error_text, reply_markup=back_kb)
+        return RECEIPT
+
     photo = update.message.photo[-1]
     context.user_data["receipt_photo_id"] = photo.file_id
     
     cancel_reminder(context, "payment_reminder", user.id)
-    schedule_reminder(context, "assessment_reminder", user.id, context.user_data.get("lang", "am"))
+    schedule_reminder(context, "assessment_reminder", user.id, lang)
 
-    # Immediately transition to detailed assessment
+    keyboard = [
+        [InlineKeyboardButton("🛋️ እንቅስቃሴ የሌለው (በብዛት ተቀምጬ የምውል)", callback_data="pact_sedentary")],
+        [InlineKeyboardButton("🚶 መካከለኛ ተንቀሳቃሽነት (ቀላል እንቅስቃሴ ያለው)", callback_data="pact_moderate")],
+        [InlineKeyboardButton("🏃 በጣም ንቁ (የተንቀሳቃሽነት ስራ ወይም ስፖርተኛ)", callback_data="pact_high")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_act")]
+    ]
     await update.message.reply_text(
         "📸 <b>ደረሰኝዎ ደርሶናል!</b>\n\nለእርስዎ የሚሆን ፍጹም የሆነ ፕሮግራም ለማዘጋጀት አሁን ጥቂት ቀላል ጥያቄዎችን እንመልስ፦\n\n"
-        "🏋️ <b>1. የዕለት ተዕለት እንቅስቃሴዎ እንዴት ነው? (ለምሳሌ፦ በብዛት ተቀምጬ ነው የምውለው, በጣም ተንቀሳቃሽ ነኝ...)</b>",
+        "🏃 <b>1. የዕለት ተዕለት እንቅስቃሴዎ ምን ይመስላል?</b>",
+        reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="HTML"
     )
     return POST_ACTIVITY
 
-async def post_activity_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["activity"] = update.message.text.strip()
-    await update.message.reply_text("🏆 <b>2. የአካል ብቃት ልምድዎ ምን ይመስላል? (ምሳሌ፡ ሙሉ ጀማሪ፣ 1 ዓመት የሰራሁ...)</b>", parse_mode="HTML")
+async def post_activity_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    lang = context.user_data.get("lang", "am")
+
+    if query.data == "nav_back_act":
+        loc_type = context.user_data.get("location_type", "et")
+        keyboard = get_pricing_keyboard(lang, loc_type)
+        await query.edit_message_text("⏱️ <b>የፕሮግራም ቆይታ ይምረጡ፦</b>" if lang == "am" else "⏱️ <b>Select your timeframe:</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        return DURATION
+
+    context.user_data["activity"] = query.data.split("_")[1]
+    keyboard = [
+        [InlineKeyboardButton("🟢 ሙሉ ጀማሪ (ገና ጀማሪ ነኝ)", callback_data="pexp_beginner")],
+        [InlineKeyboardButton("🟡 መካከለኛ (መሰረታዊ ነገሮችን አውቃለሁ)", callback_data="pexp_intermediate")],
+        [InlineKeyboardButton("🔴 ልምድ ያለው (ጂም የቆየሁ)", callback_data="pexp_advanced")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_exp")]
+    ]
+    await query.edit_message_text("🏆 <b>2. የአካል ብቃት ልምድዎ ምን ይመስላል?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return POST_EXPERIENCE
 
-async def post_experience_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["experience"] = update.message.text.strip()
-    await update.message.reply_text("🏋️‍♂️ <b>3. ምን ዓይነት መሣሪያዎች አሉዎት? (ምሳሌ፡ ጂም ቤት፣ የቤት ውስጥ 덤bell፣ ወይም ምንም የለም)</b>", parse_mode="HTML")
+async def post_experience_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    lang = context.user_data.get("lang", "am")
+
+    if query.data == "nav_back_exp":
+        keyboard = [
+            [InlineKeyboardButton("🛋️ እንቅስቃሴ የሌለው (በብዛት ተቀምጬ የምውል)", callback_data="pact_sedentary")],
+            [InlineKeyboardButton("🚶 መካከለኛ ተንቀሳቃሽነት (ቀላል እንቅስቃሴ ያለው)", callback_data="pact_moderate")],
+            [InlineKeyboardButton("🏃 በጣም ንቁ (የተንቀሳቃሽነት ስራ ወይም ስፖርተኛ)", callback_data="pact_high")],
+            [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_act")]
+        ]
+        await query.edit_message_text("🏃 <b>1. የዕለት ተዕለት እንቅስቃሴዎ ምን ይመስላል?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        return POST_ACTIVITY
+
+    context.user_data["experience"] = query.data.split("_")[1]
+    keyboard = [
+        [InlineKeyboardButton("🏠 ምንም መሳሪያ የለም (ቤት ውስጥ)", callback_data="peqp_none")],
+        [InlineKeyboardButton("🎒 አነስተኛ መሳሪያዎች (ዳምቤል/ላስቲክ)", callback_data="peqp_some")],
+        [InlineKeyboardButton("🏋️ ሙሉ ጂም ቤት እሄዳለሁ", callback_data="peqp_gym")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_eqp")]
+    ]
+    await query.edit_message_text("🏋️‍♂️ <b>3. ምን ዓይነት የስፖርት መሣሪያዎች አሉዎት?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return POST_EQUIPMENT
 
-async def post_equipment_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["equipment"] = update.message.text.strip()
-    await update.message.reply_text("🚧 <b>4. በጉዞዎ ላይ ሊያጋጥሙዎት የሚችሉ ዋና ዋና ችግሮች ወይም ፈተናዎች ምንድን ናቸው?</b>", parse_mode="HTML")
+async def post_equipment_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    lang = context.user_data.get("lang", "am")
+
+    if query.data == "nav_back_eqp":
+        keyboard = [
+            [InlineKeyboardButton("🟢 ሙሉ ጀማሪ (ገና ጀማሪ ነኝ)", callback_data="pexp_beginner")],
+            [InlineKeyboardButton("🟡 መካከለኛ (መሰረታዊ ነገሮችን አውቃለሁ)", callback_data="pexp_intermediate")],
+            [InlineKeyboardButton("🔴 ልምድ ያለው (ጂም የቆየሁ)", callback_data="pexp_advanced")],
+            [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_exp")]
+        ]
+        await query.edit_message_text("🏆 <b>2. የአካል ብቃት ልምድዎ ምን ይመስላል?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        return POST_EXPERIENCE
+
+    context.user_data["equipment"] = query.data.split("_")[1]
+    keyboard = [
+        [InlineKeyboardButton("⏰ የጊዜ እጥረት (ለስፖርትም ሆነ ምግብ ለማዘጋጀት)", callback_data="pobs_time")],
+        [InlineKeyboardButton("🍱 የተስተካከለ የአመጋገብ ሥርዓት አለማወቅ", callback_data="pobs_diet")],
+        [InlineKeyboardButton("📉 ወጥነት ማጣት (ጀምሮ ማቋረጥ)", callback_data="pobs_consistency")],
+        [InlineKeyboardButton("🍔 ጤናማ ያልሆነ የምግብ ምርጫ / ጣፋጭ መብዛት", callback_data="pobs_food")],
+        [InlineKeyboardButton("❓ ትክክለኛ የሥልጠና እቅድ አለማወቅ", callback_data="pobs_plan")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_obs")]
+    ]
+    await query.edit_message_text("🚧 <b>4. አሁን ላይ ለውጥ እንዳያመጡ ትልቁ ፈተናዎ ወይም ችግርዎ ምንድን ነው?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return POST_OBSTACLE
 
-async def post_obstacle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["obstacle"] = update.message.text.strip()
-    await update.message.reply_text("⭐ <b>5. ለዚህ ለውጥ ምን ያህል ተዘጋጅተዋል? (ከ 1 እስከ 10 ቁጥር ይጻፉ)</b>", parse_mode="HTML")
+async def post_obstacle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    lang = context.user_data.get("lang", "am")
+
+    if query.data == "nav_back_obs":
+        keyboard = [
+            [InlineKeyboardButton("🏠 ምንም መሳሪያ የለም (ቤት ውስጥ)", callback_data="peqp_none")],
+            [InlineKeyboardButton("🎒 አነስተኛ መሳሪያዎች (ዳምቤል/ላስቲክ)", callback_data="peqp_some")],
+            [InlineKeyboardButton("🏋️ ሙሉ ጂም ቤት እሄዳለሁ", callback_data="peqp_gym")],
+            [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_eqp")]
+        ]
+        await query.edit_message_text("🏋️‍♂️ <b>3. ምን ዓይነት የስፖርት መሣሪያዎች አሉዎት?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        return POST_EQUIPMENT
+
+    context.user_data["obstacle"] = "_".join(query.data.split("_")[1:])
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_readiness")]])
+    
+    await query.edit_message_text(
+        "⭐ <b>5. ለዚህ ለውጥ ምን ያህል ተዘጋጅተዋል? (እባክዎ ከ 1 እስከ 10 ባለው ቁጥር ብቻ ይጻፉ)</b>",
+        reply_markup=back_kb,
+        parse_mode="HTML"
+    )
     return POST_READINESS
 
 async def post_readiness_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["readiness"] = update.message.text.strip()
-    await update.message.reply_text("⚠️ <b>6. ያሉብዎት የጤና እክሎች ወይም አሮጌ ጉዳቶች አሉ? (ካሉ ይጻፉ፣ ከሌለ 'የለም' ይበሉ)</b>", parse_mode="HTML")
+    lang = context.user_data.get("lang", "am")
+    text = update.message.text.strip()
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_readiness")]])
+
+    if not text.isdigit() or not (1 <= int(text) <= 10):
+        error_msg = "❌ እባክዎ ከ 1 እስከ 10 ያለ ቁጥር ብቻ ያስገቡ (ምሳሌ፡ 8)፦" if lang == "am" else "❌ Please enter a number between 1 and 10:"
+        await update.message.reply_text(error_msg, reply_markup=back_kb)
+        return POST_READINESS
+
+    context.user_data["readiness"] = text
+    back_kb_health = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_health")]])
+    await update.message.reply_text("⚠️ <b>6. ያሉብዎት የጤና እክሎች ወይም አሮጌ ጉዳቶች አሉ? (እባክዎ በጽሁፍ ይጻፉ፣ ከሌለ 'የለም' ይበሉ)</b>", reply_markup=back_kb_health, parse_mode="HTML")
     return POST_HEALTH
 
 async def post_health_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = context.user_data.get("lang", "am")
     context.user_data["injuries"] = update.message.text.strip()
-    await update.message.reply_text("🥗 <b>7. ልዩ የምግብ ምርጫዎች ወይም አለርጂዎች አሉዎት? (ምሳሌ፡ ጾም የምይዝ ከሆነ፣ የማልወደው ምግብ...)</b>", parse_mode="HTML")
+    back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_diet")]])
+
+    await update.message.reply_text("🥗 <b>7. ልዩ የምግብ ምርጫዎች ወይም አለርጂዎች አሉዎት? (እባክዎ በጽሁፍ በግልጽ ይጻፉ)</b>", reply_markup=back_kb, parse_mode="HTML")
     return POST_DIET
 
 async def post_diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    lang = context.user_data.get("lang", "am")
     context.user_data["diet"] = update.message.text.strip()
-    await update.message.reply_text("🍽️ <b>8. በቀን ስንት ጊዜ መመገብ ይወዳሉ? የዕለት አመጋገብዎ ሁኔታ ምን ይመስላል?</b>", parse_mode="HTML")
+
+    keyboard = [
+        [InlineKeyboardButton("📉 ከ 2 ጊዜ በታች", callback_data="peat_under2")],
+        [InlineKeyboardButton("⚖️ 3 ጊዜ", callback_data="peat_3")],
+        [InlineKeyboardButton("📈 ከ 3 ጊዜ በላይ", callback_data="peat_over3")],
+        [InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_diet_choice")]
+    ]
+    await update.message.reply_text("🍽️ <b>8. በቀን ስንት ጊዜ መመገብ ይወዳሉ?</b>", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
     return POST_EATING_STYLE
 
-async def post_eating_style_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def post_eating_style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    lang = context.user_data.get("lang", "am")
+
+    if query.data == "nav_back_diet_choice":
+        back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_health")]])
+        await query.edit_message_text("⚠️ <b>6. ያሉብዎት የጤና እክሎች ወይም አሮጌ ጉዳቶች አሉ? (እባክዎ በጽሁፍ ይጻፉ፣ ከሌለ 'የለም' ይበሉ)</b>", reply_markup=back_kb, parse_mode="HTML")
+        return POST_HEALTH
+
+    context.user_data["eating_style"] = query.data.split("_")[1]
     user = update.effective_user
-    context.user_data["eating_style"] = update.message.text.strip()
     
-    # Save complete client data to Supabase
+    # Save core lead profile directly to Supabase
     save_lead_to_supabase(context.user_data, user)
     cancel_reminder(context, "assessment_reminder", user.id)
 
-    # Notify Admin with Complete Receipt + Core Biometrics + Profile Summary
+    # Notify Admin with Complete Card
     admin_card = (
         f"📥 <b>NEW COMPLETE CLIENT SUBMISSION!</b>\n"
         f"Client: {user.full_name} (`{user.id}`)\n"
@@ -442,25 +716,40 @@ async def post_eating_style_input(update: Update, context: ContextTypes.DEFAULT_
                 await context.bot.send_message(chat_id=admin_id, text=admin_card, reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="HTML")
         except Exception: pass
 
-    await update.message.reply_text(
+    completion_text = (
         "🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
-        "ሳይመን መረጃዎን አይቶ ክፍያዎን ሲያረጋግጥ መልእክት ይደርስዎታል።",
-        parse_mode="HTML"
+        "ሳይመን መረጃዎን እና ክፍያዎን እያረጋገጠ ነው። ክፍያው እንደተረጋገጠ ወደ **Bot #2 (Client Portal)** መግቢያ ሊንክ ወዲያውኑ ይላክልዎታል።"
+        if lang == "am"
+        else
+        "🎉 <b>Registration and assessment complete!</b>\n\n"
+        "Simon is reviewing your details and payment. As soon as confirmed, your direct link to **Bot #2 (Client Portal)** will be sent here!"
     )
+
+    await query.edit_message_text(completion_text, parse_mode="HTML")
     return ConversationHandler.END
 
 
+# ==========================================
+# ⚙️ ADMIN ACTION CALLBACKS (SECURED)
+# ==========================================
 async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
+    # Security Guardrail: Only authorized admins can confirm/reject
+    if query.from_user.id not in ADMIN_USER_IDS:
+        await query.answer("❌ Unauthorized action.", show_alert=True)
+        return
+
     action, client_id_str = query.data.split("_")[1:]
     client_id = int(client_id_str)
 
     if action == "confirm":
-        try: supabase.table("clients").update({"is_active": True, "payment_status": "Paid"}).eq("id", client_id).execute()
-        except Exception: pass
+        try: 
+            supabase.table("clients").update({"is_active": True, "payment_status": "Paid"}).eq("id", client_id).execute()
+        except Exception as e:
+            logging.error(f"Failed to activate client in Supabase: {e}")
         
-        # Clean inline button for portal handoff
         portal_button = InlineKeyboardMarkup([
             [InlineKeyboardButton("🚀 Open Client Portal (Bot #2)", url=BOT_2_LINK)]
         ])
@@ -477,6 +766,9 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ❌ REJECTED", parse_mode="HTML")
 
 
+# ==========================================
+# 🏁 MAIN ENTRY POINT
+# ==========================================
 def main():
     threading.Thread(target=run_web_server, daemon=True).start()
     persistence = PicklePersistence(filepath="bot_persistence")
@@ -489,23 +781,49 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             LANGUAGE: [CallbackQueryHandler(language_choice, pattern="^lang_")],
-            GENDER: [CallbackQueryHandler(gender_choice, pattern="^gen_")],
-            LOCATION: [CallbackQueryHandler(location_choice, pattern="^loc_")],
-            AGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, age_input)],
-            HEIGHT: [MessageHandler(filters.TEXT & ~filters.COMMAND, height_input)],
-            WEIGHT: [MessageHandler(filters.TEXT & ~filters.COMMAND, weight_input)],
-            GOAL: [CallbackQueryHandler(goal_choice, pattern="^goal_")],
-            PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_input)],
-            DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
-            RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
-            POST_ACTIVITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_activity_input)],
-            POST_EXPERIENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_experience_input)],
-            POST_EQUIPMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_equipment_input)],
-            POST_OBSTACLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_obstacle_input)],
-            POST_READINESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_readiness_input)],
-            POST_HEALTH: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_health_input)],
-            POST_DIET: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)],
-            POST_EATING_STYLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_eating_style_input)],
+            GENDER: [CallbackQueryHandler(gender_choice, pattern="^(gen_|nav_back_lang)")],
+            LOCATION: [CallbackQueryHandler(location_choice, pattern="^(loc_|nav_back_gender)")],
+            AGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, age_input),
+                CallbackQueryHandler(location_choice, pattern="^nav_back_gender$")
+            ],
+            HEIGHT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, height_input),
+                CallbackQueryHandler(location_choice, pattern="^nav_back_age$")
+            ],
+            WEIGHT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, weight_input),
+                CallbackQueryHandler(location_choice, pattern="^nav_back_height$")
+            ],
+            GOAL: [
+                CallbackQueryHandler(goal_choice, pattern="^(goal_|nav_back_weight)")
+            ],
+            PHONE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, phone_input),
+                CallbackQueryHandler(goal_choice, pattern="^nav_back_goal$")
+            ],
+            DURATION: [CallbackQueryHandler(duration_choice, pattern="^(dur_|nav_back_phone)")],
+            RECEIPT: [
+                MessageHandler(filters.PHOTO | (filters.TEXT & ~filters.COMMAND), receipt_upload),
+                CallbackQueryHandler(duration_choice, pattern="^nav_back_dur$")
+            ],
+            POST_ACTIVITY: [CallbackQueryHandler(post_activity_choice, pattern="^(pact_|nav_back_act)")],
+            POST_EXPERIENCE: [CallbackQueryHandler(post_experience_choice, pattern="^(pexp_|nav_back_exp)")],
+            POST_EQUIPMENT: [CallbackQueryHandler(post_equipment_choice, pattern="^(peqp_|nav_back_eqp)")],
+            POST_OBSTACLE: [CallbackQueryHandler(post_obstacle_choice, pattern="^(pobs_|nav_back_obs)")],
+            POST_READINESS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, post_readiness_input),
+                CallbackQueryHandler(post_equipment_choice, pattern="^nav_back_readiness$")
+            ],
+            POST_HEALTH: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, post_health_input),
+                CallbackQueryHandler(post_obstacle_choice, pattern="^nav_back_health$")
+            ],
+            POST_DIET: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input),
+                CallbackQueryHandler(post_readiness_input, pattern="^nav_back_diet$")
+            ],
+            POST_EATING_STYLE: [CallbackQueryHandler(post_eating_style_choice, pattern="^(peat_|nav_back_diet_choice)")],
         },
         fallbacks=[], name="onboarding", persistent=True,
     )
