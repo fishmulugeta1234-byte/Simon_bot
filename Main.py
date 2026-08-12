@@ -258,21 +258,24 @@ async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYP
 
     try:
         if isinstance(update, Update) and update.effective_chat:
+            lang = "am"
+            if context.user_data:
+                lang = context.user_data.get("lang", "am")
+
             err_text = (
-                f"⚠️ <b>ይቅርታ፣ ያልጠበቅነው ችግር ገጥሟል። "
-                f"እባክዎ /start በመጫን እንደገና ይሞክሩ።</b>\n\n"
+                "⚠️ ይቅርታ፣ ያልጠበቅነው ችግር ገጥሟል።\n"
+                "እባክዎ /start በመጫን እንደገና ይሞክሩ።\n\n"
                 f"ጥያቄ ካለዎት በቀጥታ ያግኙን፦ {SUPPORT_HANDLE}"
-                if context.user_data.get("lang", "am") == "am"
+                if lang == "am"
                 else
-                f"⚠️ <b>Oops, something went wrong. "
-                f"Please tap /start to restart.</b>\n\n"
+                "⚠️ Oops, something went wrong.\n"
+                "Please tap /start to restart.\n\n"
                 f"Need help? Contact Simon: {SUPPORT_HANDLE}"
             )
 
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text=err_text,
-                parse_mode="HTML",
             )
     except Exception:
         logging.exception("Failed to send global error message")
