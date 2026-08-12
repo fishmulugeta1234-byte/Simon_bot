@@ -158,7 +158,7 @@ def get_faq_text(loc):
     if loc == "et":
         return (
             "📋 <b>የፕሮግራሞች ዝርዝር እና ተደጋጋሚ ጥያቄዎች (FAQ)</b>\n\n"
-            "• <b>የምግብ እቅድ (1,200 ETB):</b> በሰውነትዎ እና በግብዎ ላይ የተመረኮዘ ልዩ የምግብ ዝግጅት እቅድ!\n"
+            "• <b>የምግብ እቅድ (ለ 2 ወራት) (1,200 ETB):</b> በሰውነትዎ እና በግብዎ ላይ የተመረኮዘ ልዩ የምግብ ዝግጅት እቅድ!\n"
             "• <b>ፈጣን ጅማሬ / 21 ቀናት (4,500 ETB):</b> ለጀማሪዎች ምርጥ ጀምሮ ፈጣን ውጤት ለማምጣት።\n"
             "• <b>የሰውነት ለውጥ / 60 ቀናት (8,900 ETB):</b> እውነተኛ የሰውነት መለወጫ ጉዞ ከሙሉ ክትትል ጋር።\n"
             "• <b>Elite / 90 ቀናት (12,500 ETB):</b> ለረጅም ጊዜ የሚዘልቅ ጠንካራ እና አሸናፊ ውጤት።\n"
@@ -169,7 +169,7 @@ def get_faq_text(loc):
     else:
         return (
             "📋 <b>Program Details & Clarity (FAQ)</b>\n\n"
-            "• <b>Meal Plan Only ($39.99):</b> Custom nutrition plan tailored precisely to your goals.\n"
+            "• <b>Meal Plan Only (2 Months) ($39.99):</b> Custom nutrition plan tailored precisely to your goals.\n"
             "• <b>Kickstart / 21 Days ($50):</b> Best for beginners building momentum.\n"
             "• <b>Transformation / 60 Days ($119):</b> Best for fat loss & muscle building.\n"
             "• <b>Elite / 90 Days ($159):</b> Best for serious long-term results.\n"
@@ -184,7 +184,7 @@ def get_pricing_keyboard(lang, loc_type):
         if loc_type == "et":
             return [
                 [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
-                [InlineKeyboardButton("🥗 የምግብ እቅድ ብቻ — 1,200 ETB", callback_data="dur_Meal_Plan_Only_1200ETB")],
+                [InlineKeyboardButton("🥗 የምግብ እቅድ (ለ 2 ወራት) — 1,200 ETB", callback_data="dur_Meal_Plan_Only_(2_Months)_1200ETB")],
                 [InlineKeyboardButton("🥉 ፈጣን ጅማሬ (21 ቀናት) — 4,500 ETB", callback_data="dur_Kickstart_(21_Days)_4500ETB")],
                 [InlineKeyboardButton("🥈 የሰውነት ለውጥ (60 ቀናት) — 8,900 ETB", callback_data="dur_Transformation_(60_Days)_8900ETB")],
                 [InlineKeyboardButton("🥇 Elite (90 ቀናት) — 12,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_12500ETB")],
@@ -194,7 +194,7 @@ def get_pricing_keyboard(lang, loc_type):
         else:
             return [
                 [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
-                [InlineKeyboardButton("🥗 Meal Plan Only — $39.99", callback_data="dur_Meal_Plan_Only_$39.99")],
+                [InlineKeyboardButton("🥗 Meal Plan Only (2 Months) — $39.99", callback_data="dur_Meal_Plan_Only_(2_Months)_$39.99")],
                 [InlineKeyboardButton("🥉 Kickstart (21 Days) — $50", callback_data="dur_Kickstart_(21_Days)_$50")],
                 [InlineKeyboardButton("🥈 Transformation (60 Days) — $119", callback_data="dur_Transformation_(60_Days)_$119")],
                 [InlineKeyboardButton("🥇 Elite (90 Days) — $159", callback_data="dur_Elite_Transformation_(90_Days)_$159")],
@@ -205,7 +205,7 @@ def get_pricing_keyboard(lang, loc_type):
         if loc_type == "et":
             return [
                 [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
-                [InlineKeyboardButton("🥗 Meal Plan Only — 1,200 ETB", callback_data="dur_Meal_Plan_Only_1200ETB")],
+                [InlineKeyboardButton("🥗 Meal Plan Only (2 Months) — 1,200 ETB", callback_data="dur_Meal_Plan_Only_(2_Months)_1200ETB")],
                 [InlineKeyboardButton("🥉 Kickstart (21 Days) — 4,500 ETB", callback_data="dur_Kickstart_(21_Days)_4500ETB")],
                 [InlineKeyboardButton("🥈 Transformation (60 Days) — 8,900 ETB", callback_data="dur_Transformation_(60_Days)_8900ETB")],
                 [InlineKeyboardButton("🥇 Elite (90 Days) — 12,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_12500ETB")],
@@ -215,7 +215,7 @@ def get_pricing_keyboard(lang, loc_type):
         else:
             return [
                 [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
-                [InlineKeyboardButton("🥗 Meal Plan Only — $39.99", callback_data="dur_Meal_Plan_Only_$39.99")],
+                [InlineKeyboardButton("🥗 Meal Plan Only (2 Months) — $39.99", callback_data="dur_Meal_Plan_Only_(2_Months)_$39.99")],
                 [InlineKeyboardButton("🥉 Kickstart (21 Days) — $50", callback_data="dur_Kickstart_(21_Days)_$50")],
                 [InlineKeyboardButton("🥈 Transformation (60 Days) — $119", callback_data="dur_Transformation_(60_Days)_$119")],
                 [InlineKeyboardButton("🥇 Elite (90 Days) — $159", callback_data="dur_Elite_Transformation_(90_Days)_$159")],
@@ -325,7 +325,7 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     data = query.data
     if "Meal_Plan_Only" in data:
-        duration_str = "Meal Plan Only"
+        duration_str = "Meal Plan Only (2 Months)"
         price_str = "1,200 ETB" if "1200" in data else "$39.99"
     else:
         dur_info = data.split("_")[1:]
