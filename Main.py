@@ -134,7 +134,7 @@ def cancel_reminder(context: ContextTypes.DEFAULT_TYPE, prefix, chat_id):
 async def send_onboarding_reminder(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     lang = (job.data or {}).get("lang", "am")
-    text = "👋 <b>ገና አልጨረሱም!</b>\n\nምዝገባዎን ገና አላጠናቀቁም። ከላይ ላለው ጥያቄ በመመለስ ይቀጥሉ፣ ወይም /start ይላኩ።" if lang == "am" else "👋 <b>Still with us?</b>\n\nReply to my last question above to continue, or send /start."
+    text = f"👋 <b>ገና አልጨረሱም!</b>\n\nምዝገባዎን ገና አላጠናቀቁም። ጥያቄ ሲኖርዎት ሳይመን ያግኙ፦ {SUPPORT_HANDLE}" if lang == "am" else f"👋 <b>Still with us?</b>\n\nContact Simon if you need help: {SUPPORT_HANDLE}"
     try: await context.bot.send_message(chat_id=job.chat_id, text=text, parse_mode="HTML")
     except Exception as e: logging.error(e)
 
@@ -148,9 +148,33 @@ async def send_payment_abandonment_reminder(context: ContextTypes.DEFAULT_TYPE):
 async def send_assessment_reminder(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     lang = (job.data or {}).get("lang", "am")
-    text = "👋 <b>ገና ጥቂት ጥያቄዎች ይቀሩዎታል!</b> እባክዎ ጥያቄዎቹን ይመልሱ።" if lang == "am" else "👋 <b>A few questions left!</b> Please answer to complete your custom plan evaluation."
+    text = f"👋 <b>ገና ጥቂት ጥያቄዎች ይቀሩዎታል!</b> እባክዎ ጥያቄዎቹን ይመልሱ። ድጋፍ ከፈለጉ፦ {SUPPORT_HANDLE}" if lang == "am" else f"👋 <b>A few questions left!</b> Contact Simon for help: {SUPPORT_HANDLE}"
     try: await context.bot.send_message(chat_id=job.chat_id, text=text, parse_mode="HTML")
     except Exception as e: logging.error(e)
+
+
+# ==========================================
+# 🛡️ GLOBAL ERROR HANDLER
+# ==========================================
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logging.error("Exception while handling an update:", exc_info=context.error)
+    try:
+        if isinstance(update, Update) and update.effective_chat:
+            err_text = (
+                f"⚠️ <b>ይቅርታ፣ ያልጠበቅነው ችግር ገጥሟል። እባክዎ /start በመጫን እንደገና ይሞክሩ።</b>\n\n"
+                f"ጥያቄ ካለዎት በቀጥታ ያግኙን፦ {SUPPORT_HANDLE}"
+                if context.user_data.get("lang", "am") == "am"
+                else
+                f"⚠️ <b>Oops, something went wrong. Please tap /start to restart.</b>\n\n"
+                f"Need help? Contact Simon: {SUPPORT_HANDLE}"
+            )
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=err_text,
+                parse_mode="HTML"
+            )
+    except Exception:
+        pass
 
 
 # ==========================================
@@ -212,7 +236,7 @@ def get_pricing_keyboard(lang, loc_type):
                 [InlineKeyboardButton(faq_btn_text, callback_data=f"faq_{loc_type}")],
                 [InlineKeyboardButton("🥗 Meal Plan Only (2 Months) — 1,200 ETB", callback_data="dur_Meal_Plan_Only_(2_Months)_1200ETB")],
                 [InlineKeyboardButton("🥉 Kickstart (21 Days) — 4,500 ETB", callback_data="dur_Kickstart_(21_Days)_4500ETB")],
-                [InlineKeyboardButton("🥈 Transformation (60 Days) — 8,900 ETB", callback_data="dur_Transformation_(60_Days)_8900ETB")],
+                [InlineKeyboardButton("🥈 የሰውነት ለውጥ (60 ቀናት) — 8,900 ETB", callback_data="dur_Transformation_(60_Days)_8900ETB")],
                 [InlineKeyboardButton("🥇 Elite (90 Days) — 12,500 ETB", callback_data="dur_Elite_Transformation_(90_Days)_12500ETB")],
                 [InlineKeyboardButton("💎 Lifestyle (6 Months) — 24,000 ETB", callback_data="dur_Lifestyle_Coaching_(6_Months)_24000ETB")],
                 [InlineKeyboardButton("👑 VIP (6 Months) — 39,000 ETB", callback_data="dur_VIP_Coaching_(6_Months)_39000ETB")],
@@ -260,7 +284,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     cancel_reminder(context, "assessment_reminder", user.id)
 
     keyboard = [[InlineKeyboardButton("🇺🇸 English", callback_data="lang_en"), InlineKeyboardButton("🇪🇹 አማርኛ", callback_data="lang_am")]]
-    await update.message.reply_text("Welcome! Please select your language / ቋንቋ ይምረጡ፦", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(
+        f"Welcome! Please select your language / ቋንቋ ይምረጡ፦\n\n❓ Contact: {SUPPORT_HANDLE}",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
     return LANGUAGE
 
 async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -500,13 +527,15 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"You can use <b>Telebirr Remit</b> or other remittance services to transfer funds to:\n\n"
             f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code> ({ACCOUNT_NAME})\n"
             f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code> ({ACCOUNT_NAME})\n\n"
-            f"📸 Once transferred, send your payment receipt screenshot below!"
+            f"📸 Once transferred, send your payment receipt screenshot below!\n\n"
+            f"❓ Need help? Contact Simon: {SUPPORT_HANDLE}"
         )
     else:
         pay_text = (
             f"💳 <b>የክፍያ መመሪያ</b>\n\n• ፓኬጅ፦ {duration_str}\n• ዋጋ፦ <b>{price_str}</b>\n\n"
             f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code>\n• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n\n"
-            f"📸 ክፍያውን ፈጽመው የደረሰኙን ስክሪንሾት ይላኩ!"
+            f"📸 ክፍያውን ፈጽመው የደረሰኙን ስክሪንሾት ይላኩ!\n\n"
+            f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
         )
     await query.edit_message_text(pay_text, reply_markup=back_kb, parse_mode="HTML")
     return RECEIPT
@@ -517,7 +546,7 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     # Guardrail: Ensure they uploaded an image screenshot
     if not update.message.photo:
-        error_text = "❌ እባክዎ የክፍያዎን የደረሰኝ ስክሪንሾት (Photo) ይላኩ፦" if lang == "am" else "❌ Please send a photo/screenshot of your payment receipt:"
+        error_text = f"❌ እባክዎ የክፍያዎን የደረሰኝ ስክሪንሾት (Photo) ይላኩ፦\n\n❓ እርዳታ ከፈለጉ፦ {SUPPORT_HANDLE}" if lang == "am" else f"❌ Please send a photo/screenshot of your payment receipt:\n\n❓ Contact: {SUPPORT_HANDLE}"
         back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_dur")]])
         await update.message.reply_text(error_text, reply_markup=back_kb)
         return RECEIPT
@@ -727,12 +756,14 @@ async def post_eating_style_choice(update: Update, context: ContextTypes.DEFAULT
         except Exception: pass
 
     completion_text = (
-        "🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
-        "ሳይመን መረጃዎን እና ክፍያዎን እያረጋገጠ ነው። ክፍያው እንደተረጋገጠ ወደ **Bot #2 (Client Portal)** መግቢያ ሊንክ ወዲያውኑ ይላክልዎታል።"
+        f"🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
+        f"ሳይመን መረጃዎን እና ክፍያዎን እያረጋገጠ ነው። ክፍያው እንደተረጋገጠ ወደ **Bot #2 (Client Portal)** መግቢያ ሊንክ ወዲያውኑ ይላክልዎታል።\n\n"
+        f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
         if lang == "am"
         else
-        "🎉 <b>Registration and assessment complete!</b>\n\n"
-        "Simon is reviewing your details and payment. As soon as confirmed, your direct link to **Bot #2 (Client Portal)** will be sent here!"
+        f"🎉 <b>Registration and assessment complete!</b>\n\n"
+        f"Simon is reviewing your details and payment. As soon as confirmed, your direct link to **Bot #2 (Client Portal)** will be sent here!\n\n"
+        f"❓ Contact: {SUPPORT_HANDLE}"
     )
 
     await query.edit_message_text(completion_text, parse_mode="HTML")
@@ -766,13 +797,13 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
         await context.bot.send_message(
             chat_id=client_id, 
-            text="✅ <b>Payment Approved! / ክፍያዎ ተረጋግጧል!</b>\n\nYour account is now active. Click the button below to open your portal and get started! 👇", 
+            text=f"✅ <b>Payment Approved! / ክፍያዎ ተረጋግጧል!</b>\n\nYour account is now active. Click the button below to open your portal and get started! 👇\n\n❓ Support: {SUPPORT_HANDLE}", 
             reply_markup=portal_button,
             parse_mode="HTML"
         )
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ✅ APPROVED", parse_mode="HTML")
     elif action == "reject":
-        await context.bot.send_message(chat_id=client_id, text="❌ Payment verification failed. Please contact support.", parse_mode="HTML")
+        await context.bot.send_message(chat_id=client_id, text=f"❌ Payment verification failed. Please contact support: {SUPPORT_HANDLE}", parse_mode="HTML")
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ❌ REJECTED", parse_mode="HTML")
 
 
@@ -784,6 +815,7 @@ def main():
     persistence = PicklePersistence(filepath="bot_persistence")
     app = ApplicationBuilder().token(BOT_TOKEN).persistence(persistence).build()
 
+    app.add_error_handler(global_error_handler)
     app.add_handler(CallbackQueryHandler(faq_callback, pattern="^faq_"))
     app.add_handler(CallbackQueryHandler(back_to_pricing_callback, pattern="^back_pricing_"))
 
