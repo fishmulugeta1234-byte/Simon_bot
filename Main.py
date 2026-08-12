@@ -1,3 +1,6 @@
+# Fixed version of Bot #1 with GENDER_PHOTO_ID and BIOMETRICS_PHOTO_ID removed and replaced with text messages
+# Replace your entire Bot #1 script with this updated version:
+
 import logging
 import os
 import re
@@ -48,10 +51,6 @@ ACCOUNT_NAME = "Simon mulugeta"
 SUPPORT_HANDLE = "@s_simon_19"
 BOT_2_LINK = "https://t.me/Simonoriginbot"
 
-# UI Image Graphics
-GENDER_PHOTO_ID = "AgACAgQAAxkBAAFRqwFqfKwio4y4NyZrB_8NyBiuI-tRwgAC6xBrG49R6VNBWlDO5BA76gEAAwIAA3kAAz0E"
-BIOMETRICS_PHOTO_ID = "AgACAgQAAxkBAAFRqvFqfKuTupRfry280QYNS3V5LpzljwAC6hBrG49R6VM5n2ngFLTqRAEAAwIAA3kAAz0E"
-
 REMINDER_DELAY_SECONDS = 3 * 60 * 60
 PAYMENT_REMINDER_DELAY = 2 * 60 * 60
 
@@ -90,7 +89,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"Bot 1 Supabase version is alive!")
 
     def log_message(self, format, *args):
-        # Keep health-check requests out of normal logs.
         return
 
 
@@ -140,12 +138,6 @@ def schedule_reminder(
     lang,
     delay=REMINDER_DELAY_SECONDS,
 ):
-    """
-    Schedule ONE reminder only.
-
-    The old implementation used run_repeating(), which caused reminders
-    to continue forever until another handler happened to cancel them.
-    """
     if context.job_queue is None:
         return
 
@@ -431,8 +423,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         InlineKeyboardButton("🇪🇹 አማርኛ", callback_data="lang_am"),
     ]]
 
-    # /start can be used as a reset while the user is already inside
-    # the ConversationHandler because it is also registered as a fallback.
     message = update.message
     if message:
         await message.reply_text(
@@ -496,9 +486,8 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ),
     ]]
 
-    await query.message.reply_photo(
-        photo=GENDER_PHOTO_ID,
-        caption=(
+    await query.edit_message_text(
+        text=(
             "👤 <b>ጾታዎን ይምረጡ፦</b>"
             if lang == "am"
             else "👤 <b>Select your gender:</b>"
@@ -506,11 +495,6 @@ async def language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="HTML",
     )
-
-    try:
-        await query.message.delete()
-    except Exception:
-        logging.exception("Could not delete language message")
 
     return GENDER
 
@@ -585,9 +569,8 @@ async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             ),
         ]]
 
-        await query.message.reply_photo(
-            photo=GENDER_PHOTO_ID,
-            caption=(
+        await query.edit_message_text(
+            text=(
                 "👤 <b>ጾታዎን ይምረጡ፦</b>"
                 if lang == "am"
                 else "👤 <b>Select your gender:</b>"
@@ -595,11 +578,6 @@ async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML",
         )
-
-        try:
-            await query.message.delete()
-        except Exception:
-            logging.exception("Could not delete location message")
 
         return GENDER
 
@@ -717,9 +695,8 @@ async def age_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
     ]])
 
-    await update.message.reply_photo(
-        photo=BIOMETRICS_PHOTO_ID,
-        caption=(
+    await update.message.reply_text(
+        text=(
             "📏 <b>ቁመትዎ በሴንቲሜትር (cm) ስንት ነው? "
             "(ምሳሌ፡ 175)</b>"
             if lang == "am"
@@ -752,9 +729,8 @@ async def height_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             "❌ I didn't catch that. Please enter a valid height in cm as a number (e.g., 175):"
         )
 
-        await update.message.reply_photo(
-            photo=BIOMETRICS_PHOTO_ID,
-            caption=error_msg,
+        await update.message.reply_text(
+            text=error_msg,
             reply_markup=back_kb,
             parse_mode="HTML",
         )
@@ -769,9 +745,8 @@ async def height_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )
     ]])
 
-    await update.message.reply_photo(
-        photo=BIOMETRICS_PHOTO_ID,
-        caption=(
+    await update.message.reply_text(
+        text=(
             "⚖️ <b>ክብደትዎ በኪሎግራም (kg) ስንት ነው? "
             "(ምሳሌ፡ 75)</b>"
             if lang == "am"
@@ -804,9 +779,8 @@ async def weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
             "❌ I didn't catch that. Please enter a valid weight in kg as a number (e.g., 75):"
         )
 
-        await update.message.reply_photo(
-            photo=BIOMETRICS_PHOTO_ID,
-            caption=error_msg,
+        await update.message.reply_text(
+            text=error_msg,
             reply_markup=back_kb,
             parse_mode="HTML",
         )
@@ -1790,7 +1764,6 @@ async def admin_action_callback(
 ):
     query = update.callback_query
 
-    # SECURITY CHECK MUST HAPPEN BEFORE THE NORMAL answer().
     if query.from_user.id not in ADMIN_USER_IDS:
         await query.answer(
             "❌ Unauthorized action.",
@@ -1935,8 +1908,6 @@ def main():
 
     app.add_error_handler(global_error_handler)
 
-    # FAQ / pricing callbacks are kept outside the conversation so they
-    # remain reachable from the pricing screen.
     app.add_handler(
         CallbackQueryHandler(
             faq_callback,
@@ -2115,8 +2086,6 @@ def main():
             ],
         },
 
-        # /cancel exits cleanly.
-        # /start is also a reset command while a conversation is active.
         fallbacks=[
             CommandHandler("cancel", cancel),
             CommandHandler("start", start),
@@ -2128,7 +2097,6 @@ def main():
 
     app.add_handler(conv_handler)
 
-    # Admin callbacks are protected inside admin_action_callback.
     app.add_handler(
         CallbackQueryHandler(
             admin_action_callback,
