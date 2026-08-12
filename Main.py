@@ -1,13 +1,11 @@
 import logging
 import os
 import threading
-import re  # [NEW UPDATE] Added for phone validation
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardRemove
+from supabase import create_client, Client
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -19,9 +17,6 @@ from telegram.ext import (
     filters,
 )
 
-# [NEW UPDATE] Supabase Import
-from supabase import create_client, Client
-
 # Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -31,6 +26,15 @@ logging.basicConfig(
 # ⚙️ CONFIGURATION & CONSTANTS
 # ==========================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+for _name, _val in [("BOT_TOKEN", BOT_TOKEN), ("SUPABASE_URL", SUPABASE_URL), ("SUPABASE_KEY", SUPABASE_KEY)]:
+    if not _val:
+        raise RuntimeError(f"Missing required environment variable: {_name}")
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 ADMIN_USER_IDS = [1622298145, 389487101]  # Both Admin IDs
 
 # Banking & Payment Info
@@ -38,26 +42,10 @@ CBE_ACCOUNT = "1000357796532"
 TELEBIRR_NUMBER = "0939998090"
 ACCOUNT_NAME = "Simon mulugeta"
 SUPPORT_HANDLE = "@s_simon_19"
-BOT_2_USERNAME = "SimonOrigin_Tracking_Bot"  # [NEW UPDATE] Replace with your actual Bot 2 handle
 
 # Reminder Delays (in seconds)
 REMINDER_DELAY_SECONDS = 3 * 60 * 60       # 3 hours for standard steps
 PAYMENT_REMINDER_DELAY = 2 * 60 * 60       # 2 hours for payment recovery
-
-# Google Sheets Configuration
-GOOGLE_SHEET_NAME = "Fitness Clients"
-CREDENTIALS_FILE = "credentials.json"
-
-# [NEW UPDATE] Supabase Configuration
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-# Initialize Supabase client if credentials exist
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-else:
-    supabase = None
-    logging.warning("Supabase credentials missing. Database sync disabled.")
 
 # Conversation States (Primary Onboarding & Verification)
 (
@@ -93,7 +81,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot 1 is alive!")
+        self.wfile.write(b"Bot 1 Supabase version is alive!")
 
 def run_web_server():
     server = HTTPServer(("0.0.0.0", 10000), HealthCheckHandler)
@@ -101,95 +89,41 @@ def run_web_server():
 
 
 # ==========================================
-# 🗄️ SUPABASE SYNC HELPERS [NEW UPDATE]
+# 📊 SUPABASE SYNC FUNCTION
 # ==========================================
-def sync_client_to_supabase(user_id, full_name, username, phone=None, goal=None, package=None, language=None):
-    if not supabase: return
+def save_lead_to_supabase(user_data, user):
     try:
         data = {
-            "id": user_id,
-            "full_name": full_name,
-            "username": username or "",
-            "updated_at": "now()"
+            "id": int(user.id),
+            "full_name": user.full_name,
+            "username": user.username or "None",
+            "phone": user_data.get("phone", ""),
+            "location_type": "Ethiopia" if user_data.get("location_type") == "et" else "Diaspora",
+            "package": user_data.get("duration", ""),
+            "price": user_data.get("price", ""),
+            "payment_status": "Paid",
+            "gender": user_data.get("gender", "Unknown"),
+            "age": int(user_data.get("age", 0)) if user_data.get("age") else 0,
+            "height": int(user_data.get("height", 0)) if user_data.get("height") else 0,
+            "weight": int(user_data.get("weight", 0)) if user_data.get("weight") else 0,
+            "goal": user_data.get("goal", "General"),
+            "activity": user_data.get("activity", "Unknown"),
+            "experience": user_data.get("experience", "Unknown"),
+            "equipment": user_data.get("equipment", "Unknown"),
+            "obstacle": user_data.get("obstacle", "Unknown"),
+            "readiness": int(user_data.get("readiness", 0)) if user_data.get("readiness") else 0,
+            "injuries": user_data.get("injuries", "None"),
+            "diet": user_data.get("diet", "None"),
+            "eating_style": user_data.get("eating_style", "Unknown"),
+            "is_active": True,
+            "language": user_data.get("lang", "am")
         }
-        if phone: data["phone_number"] = phone
-        if goal: data["goal"] = goal
-        if package: data["package"] = package
-        if language: data["language"] = language
         
+        # Upsert client data into Supabase table 'clients'
         supabase.table("clients").upsert(data).execute()
+        logging.info("Successfully saved client to Supabase!")
     except Exception as e:
-        logging.error(f"Supabase Client Sync Error: {e}")
-
-def record_receipt_in_supabase(user_id, file_id):
-    if not supabase: return
-    try:
-        supabase.table("client_media").insert({
-            "client_id": user_id,
-            "media_type": "receipt",
-            "telegram_file_id": file_id,
-            "status": "pending"
-        }).execute()
-    except Exception as e:
-        logging.error(f"Supabase Receipt Sync Error: {e}")
-
-def save_assessment_to_supabase(user_id, baseline_weight):
-    if not supabase: return
-    try:
-        supabase.table("clients").update({
-            "baseline_weight": baseline_weight,
-            "updated_at": "now()"
-        }).eq("id", user_id).execute()
-    except Exception as e:
-        logging.error(f"Supabase Assessment Sync Error: {e}")
-
-
-# ==========================================
-# 📊 GOOGLE SHEETS & TIMESTAMP SYNC
-# ==========================================
-def save_lead_to_google_sheet(user_data, user):
-    try:
-        scope = [
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive",
-        ]
-        creds = ServiceAccountCredentials.from_json_keyfile_name(
-            CREDENTIALS_FILE, scope
-        )
-        client = gspread.authorize(creds)
-        sheet = client.open(GOOGLE_SHEET_NAME).sheet1
-
-        registration_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
-
-        row_data = [
-            registration_timestamp,
-            user.full_name,
-            user.username or "None",
-            int(user.id),
-            user_data.get("phone", ""),
-            "Ethiopia" if user_data.get("location_type") == "et" else "Diaspora",
-            user_data.get("duration", ""),
-            user_data.get("price", ""),
-            "Paid",
-            user_data.get("gender", "Unknown"),
-            int(user_data.get("age", 0)) if user_data.get("age") else 0,
-            int(user_data.get("height", 0)) if user_data.get("height") else 0,
-            int(user_data.get("weight", 0)) if user_data.get("weight") else 0,
-            user_data.get("goal", "General"),
-            user_data.get("activity", "Unknown"),
-            user_data.get("experience", "Unknown"),
-            user_data.get("equipment", "Unknown"),
-            user_data.get("obstacle", "Unknown"),
-            int(user_data.get("readiness", 0)) if user_data.get("readiness") else 0,
-            user_data.get("injuries", "None"),
-            user_data.get("diet", "None"),
-            user_data.get("eating_style", "Unknown"),
-        ]
-
-        sheet.append_row(row_data)
-        logging.info("Successfully saved client and timestamp to Google Sheet!")
-    except Exception as e:
-        logging.error(f"Exception while saving to Google Sheet: {e}")
+        logging.error(f"Exception while saving to Supabase: {e}")
 
 
 # ==========================================
@@ -273,19 +207,6 @@ async def send_assessment_reminder(context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=job.chat_id, text=text, parse_mode="HTML")
     except Exception as e:
         logging.error(f"Failed to send assessment reminder to {job.chat_id}: {e}")
-
-
-# ==========================================
-# 🛑 GLOBAL CANCEL FALLBACK [NEW UPDATE]
-# ==========================================
-async def cancel_flow(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data.clear()
-    await update.message.reply_text(
-        "🔄 <b>ሂደቱ ተቋርጧል! / Process cancelled.</b>\n\nእንደገና ለመጀመር /start ይበሉ።",
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode="HTML"
-    )
-    return ConversationHandler.END
 
 
 # ==========================================
@@ -386,7 +307,7 @@ async def back_to_pricing_callback(update: Update, context: ContextTypes.DEFAULT
     text = (
         "⏱️ <b>ለስንት ጊዜያት መለወጥ ይፈልጋሉ? (የፕሮግራም ቆይታ ይምረጡ)፦</b>\n\n💡 <i>እያንዳንዱ ፓኬጅ ምንን እንደሚያካትት ለማየት ከላይ ያለውን የዝርዝር መግለጫ (FAQ) ቁልፍ መጫን ይችላሉ።</i>"
         if lang == "am"
-        else ("⏱️ <b>Select your transformation timeframe:</b>\n\n💡 <i>Tap the FAQ button above anytime to see what each tier includes.</i>")
+        else "⏱️ <b>Select your transformation timeframe:</b>\n\n💡 <i>Tap the FAQ button above anytime to see what each tier includes.</i>"
     )
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
@@ -400,9 +321,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     cancel_reminder(context, "onboarding_reminder", user.id)
     cancel_reminder(context, "payment_reminder", user.id)
     cancel_reminder(context, "assessment_reminder", user.id)
-
-    # [NEW UPDATE] Log initial lead to Supabase
-    sync_client_to_supabase(user.id, user.full_name, user.username)
 
     user_link = f"<a href='tg://user?id={user.id}'>{user.full_name}</a>"
     admin_log_msg = (
@@ -554,7 +472,7 @@ async def weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 # ==========================================
-# 📞 STEP 5: GOAL & PHONE VERIFICATION (UPGRADED)
+# 📞 STEP 5: GOAL & PHONE VERIFICATION
 # ==========================================
 async def goal_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -575,12 +493,9 @@ async def goal_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
 async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     lang = context.user_data.get("lang", "am")
     raw_phone = update.message.text.strip()
-    
-    # [NEW UPDATE] Robust Phone Validation Regex for Ethiopian & Standard numbers
-    clean_phone = re.sub(r'[\s\-]', '', raw_phone)
-    pattern = r'^(?:\+251|251|0)?(9|7)\d{8}$'
 
-    if not re.match(pattern, clean_phone):
+    digit_count = sum(1 for char in raw_phone if char.isdigit())
+    if digit_count < 9:
         error_msg = (
             "❌ <b>እባክዎ ትክክለኛ የስልክ ቁጥር ያስገቡ!</b>\nምሳሌ፦ 0911223344 ወይም +251911223344"
             if lang == "am"
@@ -589,19 +504,7 @@ async def phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await update.message.reply_text(error_msg, parse_mode="HTML")
         return PHONE
 
-    context.user_data["phone"] = clean_phone
-    
-    # [NEW UPDATE] Sync Goal and Validated Phone to Supabase
-    user = update.effective_user
-    sync_client_to_supabase(
-        user_id=user.id, 
-        full_name=user.full_name, 
-        username=user.username, 
-        phone=clean_phone, 
-        goal=context.user_data.get("goal"),
-        language=lang
-    )
-
+    context.user_data["phone"] = raw_phone
     loc_type = context.user_data.get("location_type", "et")
     keyboard = get_pricing_keyboard(lang, loc_type)
 
@@ -633,18 +536,9 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["duration"] = duration_str
     context.user_data["price"] = price_str
 
-    # [NEW UPDATE] Sync chosen package to Supabase
-    sync_client_to_supabase(
-        user_id=update.effective_user.id,
-        full_name=update.effective_user.full_name,
-        username=update.effective_user.username,
-        package=duration_str
-    )
-
     lang = context.user_data.get("lang", "am")
     loc_type = context.user_data.get("location_type", "et")
 
-    # Schedule Payment Recovery Reminder if they abandon at receipt upload
     cancel_reminder(context, "onboarding_reminder", update.effective_user.id)
     schedule_reminder(context, "payment_reminder", update.effective_user.id, lang, delay=PAYMENT_REMINDER_DELAY)
 
@@ -686,23 +580,15 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = context.user_data.get("lang", "am")
     loc_type = context.user_data.get("location_type", "et")
 
-    # [NEW UPDATE] Log receipt to Supabase
-    record_receipt_in_supabase(user.id, photo.file_id)
-
     loc = "🇪🇹 Ethiopia" if loc_type == "et" else "🌎 Diaspora"
     registration_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
 
-    # [NEW UPDATE] Upgraded Admin Deep Links (WhatsApp + Telegram)
-    tg_deep_link = f"<a href='tg://user?id={user.id}'>{user.full_name}</a>"
-    raw_phone = context.user_data.get('phone', 'N/A')
-    wa_phone = re.sub(r'^0', '251', raw_phone) if raw_phone != 'N/A' else ""
-    wa_link = f"<a href='https://wa.me/{wa_phone}'>{raw_phone}</a>" if wa_phone else "N/A"
-
+    user_link = f"<a href='tg://user?id={user.id}'>{user.full_name}</a>"
     admin_card = (
         f"📥 <b>NEW PAYMENT RECEIPT UPLOADED!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 <b>Client:</b> {tg_deep_link} (@{user.username or 'No_Username'})\n"
-        f"📞 <b>Phone:</b> {wa_link}\n"
+        f"👤 <b>Client:</b> {user_link} (@{user.username or 'No_Username'})\n"
+        f"📞 <b>Phone:</b> {context.user_data.get('phone')}\n"
         f"🆔 <b>ID:</b> <code>{user.id}</code>\n"
         f"📅 <b>Uploaded At:</b> {registration_timestamp}\n"
         f"🌐 <b>Language:</b> {'Amharic' if lang == 'am' else 'English'}\n"
@@ -893,12 +779,7 @@ async def post_eating_style_choice(update: Update, context: ContextTypes.DEFAULT
     lang = context.user_data.get("lang", "am")
 
     cancel_reminder(context, "assessment_reminder", user.id)
-    
-    # Keep Google Sheets Sync Intact
-    save_lead_to_google_sheet(context.user_data, user)
-    
-    # [NEW UPDATE] Save Baseline Assessment to Supabase
-    save_assessment_to_supabase(user.id, context.user_data.get('weight', 0))
+    save_lead_to_supabase(context.user_data, user)
 
     completion_timestamp = datetime.now().strftime("%Y-%b-%d %H:%M:%S")
     user_link = f"<a href='tg://user?id={user.id}'>{user.full_name}</a>"
@@ -964,6 +845,12 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     client_id = int(client_id_str)
 
     if action == "confirm":
+        # Also ensure is_active is set to true in Supabase upon payment confirmation
+        try:
+            supabase.table("clients").update({"is_active": True}).eq("id", client_id).execute()
+        except Exception:
+            pass
+
         await context.bot.send_message(
             chat_id=client_id,
             text=(
@@ -988,59 +875,6 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
             caption=query.message.caption + "\n\n<b>STATUS:</b> ❌ REJECTED",
             parse_mode="HTML",
         )
-
-
-# ==========================================
-# 🚀 ADMIN DISPATCH COMMAND (BOT #2 HANDOFF) [NEW UPDATE]
-# ==========================================
-async def admin_send_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ADMIN_USER_IDS:
-        return
-
-    try:
-        client_id = int(context.args[0])
-        meal_url = context.args[1]
-        workout_url = context.args[2]
-    except (IndexError, ValueError):
-        await update.message.reply_text(
-            "❌ **Usage:** `/send_plan <client_id> <meal_pdf_url> <workout_pdf_url>`",
-            parse_mode="Markdown"
-        )
-        return
-
-    # Update Supabase active status
-    if supabase:
-        try:
-            supabase.table("clients").update({
-                "meal_plan_url": meal_url,
-                "workout_plan_url": workout_url,
-                "is_active": True
-            }).eq("id", client_id).execute()
-        except Exception as e:
-            logging.error(f"Failed to update URLs in Supabase: {e}")
-
-    keyboard = [
-        [InlineKeyboardButton("🥗 View Meal Plan (PDF)", url=meal_url)],
-        [InlineKeyboardButton("🏋️ View Workout Plan (PDF)", url=workout_url)],
-        [InlineKeyboardButton("🚀 Open Tracking Bot (Bot #2)", url=f"https://t.me/{BOT_2_USERNAME}")]
-    ]
-
-    dispatch_text = (
-        "🎉 **የግል ስልጠና እቅድዎ ዝግጁ ነው! / Your Custom Plan is Ready!**\n\n"
-        "የእርስዎን የቪዲዮ/PDF ስልጠናዎች ከታች ካሉት አዝራሮች በመጫን ማግኘት ይችላሉ።\n\n"
-        "የቀን ተቀን እንቅስቃሴዎን ለማስመዝገብ እና ለመከታተል አሁኑኑ ወደ **Tracking Bot** በመሄድ /start ይበሉ!"
-    )
-
-    try:
-        await context.bot.send_message(
-            chat_id=client_id,
-            text=dispatch_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
-        )
-        await update.message.reply_text(f"✅ Plan & Bot #2 link sent to client `{client_id}`!", parse_mode="Markdown")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Failed to send plan to client `{client_id}`: {e}")
 
 
 # ==========================================
@@ -1069,7 +903,7 @@ def main():
             DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
             RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
         },
-        fallbacks=[CommandHandler("cancel", cancel_flow)],  # [NEW UPDATE] Added global cancel fallback
+        fallbacks=[],
         name="onboarding_conversation",
         persistent=True,
     )
@@ -1086,7 +920,7 @@ def main():
             POST_DIET: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)],
             POST_EATING_STYLE: [CallbackQueryHandler(post_eating_style_choice, pattern="^peat_")],
         },
-        fallbacks=[CommandHandler("cancel", cancel_flow)],  # [NEW UPDATE] Added global cancel fallback
+        fallbacks=[],
         name="post_payment_conversation",
         persistent=True,
     )
@@ -1094,9 +928,8 @@ def main():
     app.add_handler(conv_handler)
     app.add_handler(post_conv_handler)
     app.add_handler(CallbackQueryHandler(admin_action_callback, pattern="^adm_"))
-    app.add_handler(CommandHandler("send_plan", admin_send_plan))  # [NEW UPDATE] Admin command to send plan and Bot #2 link
 
-    print("⚡ Upgraded Bot #1 is LIVE with Supabase, phone validation & payment recovery...")
+    print("⚡ Bot #1 with Supabase Integration is LIVE!")
     app.run_polling()
 
 if __name__ == "__main__":
