@@ -330,10 +330,9 @@ async def location_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     lang = context.user_data.get("lang", "am")
     back_kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_gender")]])
     
-    # Send image with Age prompt
-    await query.message.reply_photo(
-        photo=BIOMETRICS_PHOTO_ID,
-        caption="⏳ <b>እቅድዎን እያዘጋጀን ነው... እባክዎ ዕድሜዎን በቁጥር ይጻፉ (ምሳሌ፡ 25)፦</b>" if lang == "am" else "⏳ <b>Please enter your age as a number (e.g., 25):</b>",
+    # Text-only for Age prompt (no photo for age as requested)
+    await query.message.reply_text(
+        "⏳ <b>እቅድዎን እያዘጋጀን ነው... እባክዎ ዕድሜዎን በቁጥር ይጻፉ (ምሳሌ፡ 25)፦</b>" if lang == "am" else "⏳ <b>Please enter your age as a number (e.g., 25):</b>",
         reply_markup=back_kb,
         parse_mode="HTML"
     )
@@ -350,15 +349,16 @@ async def age_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if not text.isdigit() or not (10 <= int(text) <= 120):
         error_msg = "❌ ይቅርታ፣ ሀሳብዎን በትክክል አልተረዳሁም። እባክዎ ትክክለኛ ዕድሜ በቁጥር ያስገቡ (ምሳሌ፡ 25)፦" if lang == "am" else "❌ I didn't catch that. Please enter a valid age as a number (e.g., 25):"
-        await update.message.reply_photo(photo=BIOMETRICS_PHOTO_ID, caption=error_msg, reply_markup=back_kb)
+        await update.message.reply_text(error_msg, reply_markup=back_kb)
         return AGE
 
     context.user_data["age"] = text
     back_kb_height = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 ተመለስ (Back)" if lang == "am" else "🔙 Back", callback_data="nav_back_age")]])
     
-    # Text-only for height as requested
-    await update.message.reply_text(
-        "📏 <b>ቁመትዎ በሴንቲሜትር (cm) ስንት ነው? (ምሳሌ፡ 175)</b>" if lang == "am" else "📏 <b>Height in cm? (e.g., 175)</b>",
+    # Show photo for height as requested
+    await update.message.reply_photo(
+        photo=BIOMETRICS_PHOTO_ID,
+        caption="📏 <b>ቁመትዎ በሴንቲሜትር (cm) ስንት ነው? (ምሳሌ፡ 175)</b>" if lang == "am" else "📏 <b>Height in cm? (e.g., 175)</b>",
         reply_markup=back_kb_height,
         parse_mode="HTML"
     )
@@ -371,7 +371,12 @@ async def height_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     if not text.isdigit() or not (50 <= int(text) <= 250):
         error_msg = "❌ ይቅርታ፣ ሀሳብዎን በትክክል አልተረዳሁም። እባክዎ ትክክለኛ ቁመት በሴንቲሜትር በቁጥር ያስገቡ (ምሳሌ፡ 175)፦" if lang == "am" else "❌ I didn't catch that. Please enter a valid height in cm as a number (e.g., 175):"
-        await update.message.reply_text(error_msg, reply_markup=back_kb)
+        await update.message.reply_photo(
+            photo=BIOMETRICS_PHOTO_ID,
+            caption=error_msg,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return HEIGHT
 
     context.user_data["height"] = text
@@ -391,7 +396,12 @@ async def weight_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     if not text.isdigit() or not (20 <= int(text) <= 300):
         error_msg = "❌ ይቅርታ፣ ሀሳብዎን በትክክል አልተረዳሁም። እባክዎ ትክክለኛ ክብደት በኪሎግራም በቁጥር ያስገቡ (ምሳሌ፡ 75)፦" if lang == "am" else "❌ I didn't catch that. Please enter a valid weight in kg as a number (e.g., 75):"
-        await update.message.reply_photo(photo=BIOMETRICS_PHOTO_ID, caption=error_msg, reply_markup=back_kb)
+        await update.message.reply_photo(
+            photo=BIOMETRICS_PHOTO_ID,
+            caption=error_msg,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return WEIGHT
 
     context.user_data["weight"] = text
