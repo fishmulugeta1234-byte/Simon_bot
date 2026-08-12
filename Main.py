@@ -42,7 +42,7 @@ BOT_2_LINK = "https://t.me/Simonoriginbot"
 REMINDER_DELAY_SECONDS = 3 * 60 * 60
 PAYMENT_REMINDER_DELAY = 2 * 60 * 60
 
-# Onboarding States
+# Full State Machine
 (
     LANGUAGE,
     GENDER,
@@ -54,10 +54,6 @@ PAYMENT_REMINDER_DELAY = 2 * 60 * 60
     PHONE,
     DURATION,
     RECEIPT,
-) = range(10)
-
-# Post-Approval Assessment States
-(
     POST_ACTIVITY,
     POST_EXPERIENCE,
     POST_EQUIPMENT,
@@ -66,7 +62,7 @@ PAYMENT_REMINDER_DELAY = 2 * 60 * 60
     POST_HEALTH,
     POST_DIET,
     POST_EATING_STYLE,
-) = range(10, 18)
+) = range(18)
 
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -90,7 +86,7 @@ def save_lead_to_supabase(user_data, user):
             "location_type": "Ethiopia" if user_data.get("location_type") == "et" else "Diaspora",
             "package": user_data.get("duration", ""),
             "price": user_data.get("price", ""),
-            "payment_status": "Paid",
+            "payment_status": "Pending_Approval",
             "gender": user_data.get("gender", "Unknown"),
             "age": int(user_data.get("age", 0)) if user_data.get("age") else 0,
             "height": int(user_data.get("height", 0)) if user_data.get("height") else 0,
@@ -104,11 +100,11 @@ def save_lead_to_supabase(user_data, user):
             "injuries": user_data.get("injuries", "None"),
             "diet": user_data.get("diet", "None"),
             "eating_style": user_data.get("eating_style", "Unknown"),
-            "is_active": True,
+            "is_active": False,
             "language": user_data.get("lang", "am")
         }
         supabase.table("clients").upsert(data).execute()
-        logging.info("Successfully saved client to Supabase!")
+        logging.info("Successfully saved client assessment to Supabase!")
     except Exception as e:
         logging.error(f"Exception while saving to Supabase: {e}")
 
@@ -146,7 +142,7 @@ async def send_payment_abandonment_reminder(context: ContextTypes.DEFAULT_TYPE):
 async def send_assessment_reminder(context: ContextTypes.DEFAULT_TYPE):
     job = context.job
     lang = (job.data or {}).get("lang", "am")
-    text = "👋 <b>ገና ጥቂት ጥያቄዎች ይቀሩዎታል!</b>" if lang == "am" else "👋 <b>A few questions left!</b>"
+    text = "👋 <b>ገና ጥቂት ጥያቄዎች ይቀሩዎታል!</b> እባክዎ ጥያቄዎቹን ይመልሱ።" if lang == "am" else "👋 <b>A few questions left!</b> Please answer to complete your custom plan evaluation."
     try: await context.bot.send_message(chat_id=job.chat_id, text=text, parse_mode="HTML")
     except Exception as e: logging.error(e)
 
@@ -357,22 +353,95 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     photo = update.message.photo[-1]
-    save_lead_to_supabase(context.user_data, user)
+    context.user_data["receipt_photo_id"] = photo.file_id
     
-    admin_card = f"📥 <b>NEW RECEIPT!</b>\nClient: {user.full_name} (`{user.id}`)\nProgram: {context.user_data.get('duration')} ({context.user_data.get('price')})"
+    cancel_reminder(context, "payment_reminder", user.id)
+    schedule_reminder(context, "assessment_reminder", user.id, context.user_data.get("lang", "am"))
+
+    # Immediately transition to detailed assessment
+    await update.message.reply_text(
+        "📸 <b>ደረሰኝዎ ደርሶናል!</b>\n\nለእርስዎ የሚሆን ፍጹም የሆነ ፕሮግራም ለማዘጋጀት አሁን ጥቂት ቀላል ጥያቄዎችን እንመልስ፦\n\n"
+        "🏋️ <b>1. የዕለት ተዕለት እንቅስቃሴዎ እንዴት ነው? (ለምሳሌ፦ በብዛት ተቀምጬ ነው የምውለው, በጣም ተንቀሳቃሽ ነኝ...)</b>",
+        parse_mode="HTML"
+    )
+    return POST_ACTIVITY
+
+async def post_activity_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["activity"] = update.message.text.strip()
+    await update.message.reply_text("🏆 <b>2. የአካል ብቃት ልምድዎ ምን ይመስላል? (ምሳሌ፡ ሙሉ ጀማሪ፣ 1 ዓመት የሰራሁ...)</b>", parse_mode="HTML")
+    return POST_EXPERIENCE
+
+async def post_experience_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["experience"] = update.message.text.strip()
+    await update.message.reply_text("🏋️‍♂️ <b>3. ምን ዓይነት መሣሪያዎች አሉዎት? (ምሳሌ፡ ጂም ቤት፣ የቤት ውስጥ 덤bell፣ ወይም ምንም የለም)</b>", parse_mode="HTML")
+    return POST_EQUIPMENT
+
+async def post_equipment_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["equipment"] = update.message.text.strip()
+    await update.message.reply_text("🚧 <b>4. በጉዞዎ ላይ ሊያጋጥሙዎት የሚችሉ ዋና ዋና ችግሮች ወይም ፈተናዎች ምንድን ናቸው?</b>", parse_mode="HTML")
+    return POST_OBSTACLE
+
+async def post_obstacle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["obstacle"] = update.message.text.strip()
+    await update.message.reply_text("⭐ <b>5. ለዚህ ለውጥ ምን ያህል ተዘጋጅተዋል? (ከ 1 እስከ 10 ቁጥር ይጻፉ)</b>", parse_mode="HTML")
+    return POST_READINESS
+
+async def post_readiness_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["readiness"] = update.message.text.strip()
+    await update.message.reply_text("⚠️ <b>6. ያሉብዎት የጤና እክሎች ወይም አሮጌ ጉዳቶች አሉ? (ካሉ ይጻፉ፣ ከሌለ 'የለም' ይበሉ)</b>", parse_mode="HTML")
+    return POST_HEALTH
+
+async def post_health_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["injuries"] = update.message.text.strip()
+    await update.message.reply_text("🥗 <b>7. ልዩ የምግብ ምርጫዎች ወይም አለርጂዎች አሉዎት? (ምሳሌ፡ ጾም የምይዝ ከሆነ፣ የማልወደው ምግብ...)</b>", parse_mode="HTML")
+    return POST_DIET
+
+async def post_diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["diet"] = update.message.text.strip()
+    await update.message.reply_text("🍽️ <b>8. በቀን ስንት ጊዜ መመገብ ይወዳሉ? የዕለት አመጋገብዎ ሁኔታ ምን ይመስላል?</b>", parse_mode="HTML")
+    return POST_EATING_STYLE
+
+async def post_eating_style_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user
+    context.user_data["eating_style"] = update.message.text.strip()
+    
+    # Save complete client data to Supabase
+    save_lead_to_supabase(context.user_data, user)
+    cancel_reminder(context, "assessment_reminder", user.id)
+
+    # Notify Admin with Complete Receipt + Profile Summary
+    admin_card = (
+        f"📥 <b>NEW COMPLETE CLIENT SUBMISSION!</b>\n"
+        f"Client: {user.full_name} (`{user.id}`)\n"
+        f"Program: {context.user_data.get('duration')} ({context.user_data.get('price')})\n"
+        f"Phone: {context.user_data.get('phone')}\n\n"
+        f"<b>Assessment Data:</b>\n"
+        f"• Activity: {context.user_data.get('activity')}\n"
+        f"• Experience: {context.user_data.get('experience')}\n"
+        f"• Equipment: {context.user_data.get('equipment')}\n"
+        f"• Health/Injuries: {context.user_data.get('injuries')}\n"
+        f"• Diet Restrictions: {context.user_data.get('diet')}\n"
+        f"• Eating Pattern: {context.user_data.get('eating_style')}"
+    )
     admin_keyboard = [[InlineKeyboardButton("✅ Confirm", callback_data=f"adm_confirm_{user.id}"), InlineKeyboardButton("❌ Reject", callback_data=f"adm_reject_{user.id}")]]
 
+    photo_id = context.user_data.get("receipt_photo_id")
     for admin_id in ADMIN_USER_IDS:
-        try: await context.bot.send_photo(chat_id=admin_id, photo=photo.file_id, caption=admin_card, reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="HTML")
+        try: 
+            if photo_id:
+                await context.bot.send_photo(chat_id=admin_id, photo=photo_id, caption=admin_card, reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="HTML")
+            else:
+                await context.bot.send_message(chat_id=admin_id, text=admin_card, reply_markup=InlineKeyboardMarkup(admin_keyboard), parse_mode="HTML")
         except Exception: pass
 
-    cancel_reminder(context, "payment_reminder", user.id)
-    await update.message.reply_text("⏳ ደረሰኝዎ ደርሶናል! ሳይመን እስኪያረጋግጥ ይጠብቁ።", parse_mode="HTML")
+    await update.message.reply_text(
+        "🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
+        "ሳይመን መረጃዎን አይቶ ክፍያዎን ሲያረጋግጥ መልእክት ይደርስዎታል።",
+        parse_mode="HTML"
+    )
     return ConversationHandler.END
 
-# ==========================================
-# 📝 POST-APPROVAL ASSESSMENT FLOW
-# ==========================================
+
 async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -380,64 +449,24 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     client_id = int(client_id_str)
 
     if action == "confirm":
-        try: supabase.table("clients").update({"is_active": True}).eq("id", client_id).execute()
+        try: supabase.table("clients").update({"is_active": True, "payment_status": "Paid"}).eq("id", client_id).execute()
         except Exception: pass
         
+        # Clean inline button for portal handoff
+        portal_button = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Open Client Portal (Bot #2)", url=BOT_2_LINK)]
+        ])
+
         await context.bot.send_message(
             chat_id=client_id, 
-            text="✅ <b>Payment Approved!</b>\n\nአሁን ለዕቅድዎ ዝግጅት የሚረዱ ተጨማሪ ጥያቄዎችን እንመልስ፦\n\n🏋️ <b>የዕለት ተዕለት እንቅስቃሴዎ እንዴት ነው? (ለምሳሌ፦ ብዙ ጊዜ ተቀምጠው የሚውሉ, በብርቱ የሚንቀሳቀሱ...)</b>", 
+            text="✅ <b>Payment Approved! / ክፍያዎ ተረጋግጧል!</b>\n\nYour account is now active. Click the button below to open your portal and get started! 👇", 
+            reply_markup=portal_button,
             parse_mode="HTML"
         )
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ✅ APPROVED", parse_mode="HTML")
     elif action == "reject":
-        await context.bot.send_message(chat_id=client_id, text="❌ Payment verification failed.", parse_mode="HTML")
+        await context.bot.send_message(chat_id=client_id, text="❌ Payment verification failed. Please contact support.", parse_mode="HTML")
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ❌ REJECTED", parse_mode="HTML")
-
-async def post_activity_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["activity"] = update.message.text.strip()
-    await update.message.reply_text("🏆 <b>የአካል ብቃት ልምድዎ ስንት ጊዜ ነው? (ምሳሌ፡ ጀማሪ፣ ከ1 ዓመት በላይ...)</b>", parse_mode="HTML")
-    return POST_EXPERIENCE
-
-async def post_experience_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["experience"] = update.message.text.strip()
-    await update.message.reply_text("🏋️‍♂️ <b>ምን ዓይነት መሣሪያዎች አሉዎት? (ምሳሌ፡ ጂም ቤት፣ የቤት ውስጥ 덤bell፣ ወይም ምንም የለም)</b>", parse_mode="HTML")
-    return POST_EQUIPMENT
-
-async def post_equipment_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["equipment"] = update.message.text.strip()
-    await update.message.reply_text("🚧 <b>በጉዞዎ ላይ ሊያጋጥሙዎት የሚችሉ ዋና ዋና ችግሮች ወይም ፈተናዎች ምንድን ናቸው?</b>", parse_mode="HTML")
-    return POST_OBSTACLE
-
-async def post_obstacle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["obstacle"] = update.message.text.strip()
-    await update.message.reply_text("⭐ <b>ለዚህ ለውጥ ምን ያህል ተዘጋጅተዋል? (ከ 1 እስከ 10 ቁጥር ይጻፉ)</b>", parse_mode="HTML")
-    return POST_READINESS
-
-async def post_readiness_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["readiness"] = update.message.text.strip()
-    await update.message.reply_text("⚠️ <b>ያሉብዎት የጤና እክሎች ወይም አሮጌ ጉዳቶች አሉ? (ካሉ በዝርዝር ይጻፉ፣ ከሌለ 'የለም' ይበሉ)</b>", parse_mode="HTML")
-    return POST_HEALTH
-
-async def post_health_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["injuries"] = update.message.text.strip()
-    await update.message.reply_text("🥗 <b>ልዩ የምግብ ምርጫዎች ወይም አለርጂዎች አሉዎት? (ምሳሌ፡ ጾም የሚይዙ ከሆነ፣ ድንች የማይወዱ...)</b>", parse_mode="HTML")
-    return POST_DIET
-
-async def post_diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["diet"] = update.message.text.strip()
-    await update.message.reply_text("🍽️ <b>በቀን ስንት ጊዜ መመገብ ይወዳሉ? የዕለት አመጋገብዎ ሁኔታ ምን ይመስላል?</b>", parse_mode="HTML")
-    return POST_EATING_STYLE
-
-async def post_eating_style_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data["eating_style"] = update.message.text.strip()
-    save_lead_to_supabase(context.user_data, update.effective_user)
-    
-    await update.message.reply_text(
-        f"🎉 <b>እንኳን ደስ አለዎት! ምዝገባዎ እና ጥያቄዎችዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
-        f"አሁን ሙሉ መረጃዎ ለሳይመን ደርሷል። እባክዎ ቀጣዩን የደንበኛ ፖርታል ቦት ይክፈቱ፦\n{BOT_2_LINK}", 
-        parse_mode="HTML"
-    )
-    return ConversationHandler.END
 
 
 def main():
@@ -461,8 +490,6 @@ def main():
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_input)],
             DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
             RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
-            
-            # Post-Approval Assessment States
             POST_ACTIVITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_activity_input)],
             POST_EXPERIENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_experience_input)],
             POST_EQUIPMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_equipment_input)],
