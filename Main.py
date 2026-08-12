@@ -17,14 +17,10 @@ from telegram.ext import (
     filters,
 )
 
-# Enable logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 
-# ==========================================
-# ⚙️ CONFIGURATION & CONSTANTS
-# ==========================================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -37,7 +33,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 ADMIN_USER_IDS = [1622298145, 389487101]
 
-# Banking & Payment Info
 CBE_ACCOUNT = "1000357796532"
 TELEBIRR_NUMBER = "0939998090"
 ACCOUNT_NAME = "Simon mulugeta"
@@ -47,6 +42,7 @@ BOT_2_LINK = "https://t.me/Simonoriginbot"
 REMINDER_DELAY_SECONDS = 3 * 60 * 60
 PAYMENT_REMINDER_DELAY = 2 * 60 * 60
 
+# Onboarding States
 (
     LANGUAGE,
     GENDER,
@@ -60,6 +56,7 @@ PAYMENT_REMINDER_DELAY = 2 * 60 * 60
     RECEIPT,
 ) = range(10)
 
+# Post-Approval Assessment States
 (
     POST_ACTIVITY,
     POST_EXPERIENCE,
@@ -335,22 +332,33 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["duration"] = duration_str
     context.user_data["price"] = price_str
     lang = context.user_data.get("lang", "am")
+    loc_type = context.user_data.get("location_type", "et")
 
     cancel_reminder(context, "onboarding_reminder", update.effective_user.id)
     schedule_reminder(context, "payment_reminder", update.effective_user.id, lang, delay=PAYMENT_REMINDER_DELAY)
 
-    pay_text = (
-        f"💳 <b>የክፍያ መመሪያ</b>\n\n• ፓኬጅ፦ {duration_str}\n• ዋጋ፦ <b>{price_str}</b>\n\n"
-        f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code>\n• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n\n"
-        f"📸 ክፍያውን ፈጽመው የደረሰኙን ስክሪንሾት ይላኩ!" if lang == "am" else
-        f"💳 <b>Payment Instructions</b>\n\n• Package: {duration_str}\n• Fee: <b>{price_str}</b>\n\nSend receipt screenshot below!"
-    )
+    if loc_type == "diaspora":
+        pay_text = (
+            f"💳 <b>Payment Instructions (Diaspora)</b>\n\n• Package: {duration_str}\n• Fee: <b>{price_str}</b>\n\n"
+            f"You can use <b>Telebirr Remit</b> or other remittance services to transfer funds to:\n\n"
+            f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code> ({ACCOUNT_NAME})\n"
+            f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code> ({ACCOUNT_NAME})\n\n"
+            f"📸 Once transferred, send your payment receipt screenshot below!"
+        )
+    else:
+        pay_text = (
+            f"💳 <b>የክፍያ መመሪያ</b>\n\n• ፓኬጅ፦ {duration_str}\n• ዋጋ፦ <b>{price_str}</b>\n\n"
+            f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code>\n• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code>\n\n"
+            f"📸 ክፍያውን ፈጽመው የደረሰኙን ስክሪንሾት ይላኩ!"
+        )
     await query.edit_message_text(pay_text, parse_mode="HTML")
     return RECEIPT
 
 async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
     photo = update.message.photo[-1]
+    save_lead_to_supabase(context.user_data, user)
+    
     admin_card = f"📥 <b>NEW RECEIPT!</b>\nClient: {user.full_name} (`{user.id}`)\nProgram: {context.user_data.get('duration')} ({context.user_data.get('price')})"
     admin_keyboard = [[InlineKeyboardButton("✅ Confirm", callback_data=f"adm_confirm_{user.id}"), InlineKeyboardButton("❌ Reject", callback_data=f"adm_reject_{user.id}")]]
 
@@ -362,6 +370,9 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await update.message.reply_text("⏳ ደረሰኝዎ ደርሶናል! ሳይመን እስኪያረጋግጥ ይጠብቁ።", parse_mode="HTML")
     return ConversationHandler.END
 
+# ==========================================
+# 📝 POST-APPROVAL ASSESSMENT FLOW
+# ==========================================
 async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -371,11 +382,63 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
     if action == "confirm":
         try: supabase.table("clients").update({"is_active": True}).eq("id", client_id).execute()
         except Exception: pass
-        await context.bot.send_message(chat_id=client_id, text="✅ <b>Payment Approved!</b>", parse_mode="HTML")
+        
+        await context.bot.send_message(
+            chat_id=client_id, 
+            text="✅ <b>Payment Approved!</b>\n\nአሁን ለዕቅድዎ ዝግጅት የሚረዱ ተጨማሪ ጥያቄዎችን እንመልስ፦\n\n🏋️ <b>የዕለት ተዕለት እንቅስቃሴዎ እንዴት ነው? (ለምሳሌ፦ ብዙ ጊዜ ተቀምጠው የሚውሉ, በብርቱ የሚንቀሳቀሱ...)</b>", 
+            parse_mode="HTML"
+        )
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ✅ APPROVED", parse_mode="HTML")
     elif action == "reject":
         await context.bot.send_message(chat_id=client_id, text="❌ Payment verification failed.", parse_mode="HTML")
         await query.edit_message_caption(caption=query.message.caption + "\n\n<b>STATUS:</b> ❌ REJECTED", parse_mode="HTML")
+
+async def post_activity_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["activity"] = update.message.text.strip()
+    await update.message.reply_text("🏆 <b>የአካል ብቃት ልምድዎ ስንት ጊዜ ነው? (ምሳሌ፡ ጀማሪ፣ ከ1 ዓመት በላይ...)</b>", parse_mode="HTML")
+    return POST_EXPERIENCE
+
+async def post_experience_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["experience"] = update.message.text.strip()
+    await update.message.reply_text("🏋️‍♂️ <b>ምን ዓይነት መሣሪያዎች አሉዎት? (ምሳሌ፡ ጂም ቤት፣ የቤት ውስጥ 덤bell፣ ወይም ምንም የለም)</b>", parse_mode="HTML")
+    return POST_EQUIPMENT
+
+async def post_equipment_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["equipment"] = update.message.text.strip()
+    await update.message.reply_text("🚧 <b>በጉዞዎ ላይ ሊያጋጥሙዎት የሚችሉ ዋና ዋና ችግሮች ወይም ፈተናዎች ምንድን ናቸው?</b>", parse_mode="HTML")
+    return POST_OBSTACLE
+
+async def post_obstacle_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["obstacle"] = update.message.text.strip()
+    await update.message.reply_text("⭐ <b>ለዚህ ለውጥ ምን ያህል ተዘጋጅተዋል? (ከ 1 እስከ 10 ቁጥር ይጻፉ)</b>", parse_mode="HTML")
+    return POST_READINESS
+
+async def post_readiness_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["readiness"] = update.message.text.strip()
+    await update.message.reply_text("⚠️ <b>ያሉብዎት የጤና እክሎች ወይም አሮጌ ጉዳቶች አሉ? (ካሉ በዝርዝር ይጻፉ፣ ከሌለ 'የለም' ይበሉ)</b>", parse_mode="HTML")
+    return POST_HEALTH
+
+async def post_health_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["injuries"] = update.message.text.strip()
+    await update.message.reply_text("🥗 <b>ልዩ የምግብ ምርጫዎች ወይም አለርጂዎች አሉዎት? (ምሳሌ፡ ጾም የሚይዙ ከሆነ፣ ድንች የማይወዱ...)</b>", parse_mode="HTML")
+    return POST_DIET
+
+async def post_diet_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["diet"] = update.message.text.strip()
+    await update.message.reply_text("🍽️ <b>በቀን ስንት ጊዜ መመገብ ይወዳሉ? የዕለት አመጋገብዎ ሁኔታ ምን ይመስላል?</b>", parse_mode="HTML")
+    return POST_EATING_STYLE
+
+async def post_eating_style_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["eating_style"] = update.message.text.strip()
+    save_lead_to_supabase(context.user_data, update.effective_user)
+    
+    await update.message.reply_text(
+        f"🎉 <b>እንኳን ደስ አለዎት! ምዝገባዎ እና ጥያቄዎችዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
+        f"አሁን ሙሉ መረጃዎ ለሳይመን ደርሷል። እባክዎ ቀጣዩን የደንበኛ ፖርታል ቦት ይክፈቱ፦\n{BOT_2_LINK}", 
+        parse_mode="HTML"
+    )
+    return ConversationHandler.END
+
 
 def main():
     threading.Thread(target=run_web_server, daemon=True).start()
@@ -398,6 +461,16 @@ def main():
             PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, phone_input)],
             DURATION: [CallbackQueryHandler(duration_choice, pattern="^dur_")],
             RECEIPT: [MessageHandler(filters.PHOTO, receipt_upload)],
+            
+            # Post-Approval Assessment States
+            POST_ACTIVITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_activity_input)],
+            POST_EXPERIENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_experience_input)],
+            POST_EQUIPMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_equipment_input)],
+            POST_OBSTACLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_obstacle_input)],
+            POST_READINESS: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_readiness_input)],
+            POST_HEALTH: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_health_input)],
+            POST_DIET: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_diet_input)],
+            POST_EATING_STYLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, post_eating_style_input)],
         },
         fallbacks=[], name="onboarding", persistent=True,
     )
