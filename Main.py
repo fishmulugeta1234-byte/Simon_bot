@@ -1747,23 +1747,33 @@ async def post_eating_style_choice(
                 user.id,
             )
 
+    portal_button = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🚀 Open Client Portal (Bot #2)",
+                url=BOT_2_LINK,
+            )
+        ]
+    ])
+
     completion_text = (
         f"🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
-        f"ሳይመን መረጃዎን እና ክፍያዎን እያረጋገጠ ነው። "
-        f"ክፍያው እንደተረጋገጠ ወደ Bot #2 (Client Portal) "
-        f"መግቢያ ሊንክ ወዲያውኑ ይላክልዎታል።\n\n"
+        f"ክፍያዎ እና መረጃዎ ተቀብለናል። ሳይመን አሁን ብጁ የምግብ እና የስልጠና እቅድዎን እያዘጋጀ ነው። "
+        f"እቅድዎ እንደተጠናቀቀ በBot #2 (Client Portal) በኩል ይደርስዎታል።\n\n"
+        f"እባክዎ ከታች ያለውን ሊንክ በመጫን ወደ Bot #2 ይግቡ! 👇\n\n"
         f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
         if lang == "am"
         else
         f"🎉 <b>Registration and assessment complete!</b>\n\n"
-        f"Simon is reviewing your details and payment. "
-        f"As soon as confirmed, your direct link to Bot #2 "
-        f"(Client Portal) will be sent here!\n\n"
+        f"We have received your payment and details. Simon is currently building your custom plan. "
+        f"It will be delivered right inside Bot #2 as soon as it's ready!\n\n"
+        f"Tap the button below to enter Bot #2 now! 👇\n\n"
         f"❓ Contact: {SUPPORT_HANDLE}"
     )
 
     await query.edit_message_text(
         completion_text,
+        reply_markup=portal_button,
         parse_mode="HTML",
     )
 
