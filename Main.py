@@ -1019,7 +1019,7 @@ async def duration_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"• <b>CBE:</b> <code>{CBE_ACCOUNT}</code> ({ACCOUNT_NAME})\n"
             f"• <b>Telebirr:</b> <code>{TELEBIRR_NUMBER}</code> ({ACCOUNT_NAME})\n\n"
             f"📸 Once transferred, send your payment receipt screenshot below!\n\n"
-            f"❓ Need help? Contact Simon: {SUPPORT_HANDLE}"
+            f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
         )
     else:
         pay_text = (
@@ -1048,7 +1048,7 @@ async def receipt_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not update.message.photo:
         error_text = (
             f"❌ እባክዎ የክፍያዎን የደረሰኝ ስክሪንሾት (Photo) ይላኩ፦\n\n"
-            f"❓ እርዳታ ከፈለጉ፦ {SUPPORT_HANDLE}"
+            f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
             if lang == "am"
             else
             f"❌ Please send a photo/screenshot of your payment receipt:\n\n"
@@ -1758,17 +1758,15 @@ async def post_eating_style_choice(
 
     completion_text = (
         f"🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
-        f"ክፍያዎ እና መረጃዎ ተቀብለናል። ሳይመን አሁን ብጁ የምግብ እና የስልጠና እቅድዎን እያዘጋጀ ነው። "
+        f"ክፍያዎ እና መረጃዎ ተቀብለናል። ሳይመን አሁን የምግብ እና የስልጠና እቅድዎን እያዘጋጀ ነው። "
         f"እቅድዎ እንደተጠናቀቀ በBot #2 (Client Portal) በኩል ይደርስዎታል።\n\n"
-        f"እባክዎ ከታች ያለውን ሊንክ በመጫን ወደ Bot #2 ይግቡ! 👇\n\n"
-        f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
+        f"እባክዎ ከታች ያለውን ሊንክ በመጫን ወደ Bot #2 ይግቡ! 👇"
         if lang == "am"
         else
         f"🎉 <b>Registration and assessment complete!</b>\n\n"
-        f"We have received your payment and details. Simon is currently building your custom plan. "
+        f"We have received your payment and details. Simon is currently building your plan. "
         f"It will be delivered right inside Bot #2 as soon as it's ready!\n\n"
-        f"Tap the button below to enter Bot #2 now! 👇\n\n"
-        f"❓ Contact: {SUPPORT_HANDLE}"
+        f"Tap the button below to enter Bot #2 now! 👇"
     )
 
     await query.edit_message_text(
@@ -1838,8 +1836,7 @@ async def admin_action_callback(
                 text=(
                     f"✅ <b>Payment Approved! / ክፍያዎ ተረጋግጧል!</b>\n\n"
                     f"Your account is now active. Click the button below "
-                    f"to open your portal and get started! 👇\n\n"
-                    f"❓ Support: {SUPPORT_HANDLE}"
+                    f"to open your portal and get started! 👇"
                 ),
                 reply_markup=portal_button,
                 parse_mode="HTML",
