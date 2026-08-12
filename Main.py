@@ -409,16 +409,24 @@ async def post_eating_style_input(update: Update, context: ContextTypes.DEFAULT_
     save_lead_to_supabase(context.user_data, user)
     cancel_reminder(context, "assessment_reminder", user.id)
 
-    # Notify Admin with Complete Receipt + Profile Summary
+    # Notify Admin with Complete Receipt + Core Biometrics + Profile Summary
     admin_card = (
         f"📥 <b>NEW COMPLETE CLIENT SUBMISSION!</b>\n"
         f"Client: {user.full_name} (`{user.id}`)\n"
         f"Program: {context.user_data.get('duration')} ({context.user_data.get('price')})\n"
         f"Phone: {context.user_data.get('phone')}\n\n"
+        f"<b>Core Biometrics:</b>\n"
+        f"• Gender: {context.user_data.get('gender')}\n"
+        f"• Age: {context.user_data.get('age')}\n"
+        f"• Height: {context.user_data.get('height')} cm\n"
+        f"• Weight: {context.user_data.get('weight')} kg\n"
+        f"• Goal: {context.user_data.get('goal')}\n\n"
         f"<b>Assessment Data:</b>\n"
         f"• Activity: {context.user_data.get('activity')}\n"
         f"• Experience: {context.user_data.get('experience')}\n"
         f"• Equipment: {context.user_data.get('equipment')}\n"
+        f"• Obstacle: {context.user_data.get('obstacle')}\n"
+        f"• Readiness: {context.user_data.get('readiness')}/10\n"
         f"• Health/Injuries: {context.user_data.get('injuries')}\n"
         f"• Diet Restrictions: {context.user_data.get('diet')}\n"
         f"• Eating Pattern: {context.user_data.get('eating_style')}"
