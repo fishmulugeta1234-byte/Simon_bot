@@ -110,16 +110,46 @@ def save_lead_to_supabase(user_data, user):
             "goal": user_data.get("goal", "General"),
             "language": user_data.get("lang", "am"),
             "package": user_data.get("duration", ""),
+            "price": user_data.get("price", ""),
             "is_active": False,
+            "gender": user_data.get("gender", ""),
+            "location_type": user_data.get("location_type", ""),
+            "age": (
+                int(user_data.get("age"))
+                if str(user_data.get("age", "")).isdigit()
+                else None
+            ),
+            "height": (
+                int(user_data.get("height"))
+                if str(user_data.get("height", "")).isdigit()
+                else None
+            ),
+            "weight": (
+                int(float(user_data.get("weight")))
+                if user_data.get("weight")
+                else None
+            ),
             "baseline_weight": (
                 float(user_data.get("weight", 0))
                 if user_data.get("weight")
                 else 0.0
             ),
+            "activity": user_data.get("activity", ""),
+            "experience": user_data.get("experience", ""),
+            "equipment": user_data.get("equipment", ""),
+            "obstacle": user_data.get("obstacle", ""),
+            "readiness": (
+                int(user_data.get("readiness"))
+                if str(user_data.get("readiness", "")).isdigit()
+                else None
+            ),
+            "injuries": user_data.get("injuries", ""),
+            "diet": user_data.get("diet", ""),
+            "eating_style": user_data.get("eating_style", ""),
         }
 
         supabase.table("clients").upsert(data).execute()
-        logging.info("Successfully saved client core profile to Supabase!")
+        logging.info("Successfully saved full client profile to Supabase!")
     except Exception:
         logging.exception("Exception while saving to Supabase")
 
