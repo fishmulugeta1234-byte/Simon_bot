@@ -1335,24 +1335,28 @@ async def post_eating_style_choice(update: Update, context: ContextTypes.DEFAULT
         except Exception:
             logging.exception("Failed to notify admin %s about client %s", admin_id, user.id)
 
-    portal_button = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 Open Client Portal (Bot #2)", url=BOT_2_LINK)]
-    ])
-
+    # NOTE: No portal link/button is sent here. The client only gets access
+    # to Bot #2 once an admin taps "Confirm" on the payment receipt
+    # (see admin_action_callback -> action == "confirm"). This avoids
+    # granting portal access before payment is actually verified, while
+    # still giving the client a clear, reassuring status update so they
+    # aren't left wondering what happens next.
     completion_text = (
         f"🎉 <b>ምዝገባዎ እና መረጃዎ ሙሉ በሙሉ ተጠናቀዋል!</b>\n\n"
-        f"ክፍያዎ እና መረጃዎ ተቀብለናል። ሳይመን አሁን የምግብ እና የስልጠና እቅድዎን እያዘጋጀ ነው። "
-        f"እቅድዎ እንደተጠናቀቀ በBot #2 (Client Portal) በኩል ይደርስዎታል።\n\n"
-        f"እባክዎ ከታች ያለውን ሊንክ በመጫን ወደ Bot #2 ይግቡ! 👇"
+        f"ክፍያዎ እና መረጃዎ ደርሶናል፣ አሁን በማረጋገጥ ላይ ነን። ክፍያዎ እንደተረጋገጠ "
+        f"ወደ Bot #2 (Client Portal) የሚያስገባውን ሊንክ እናደርስዎታለን።\n\n"
+        f"⏱️ ብዙውን ጊዜ ይህ ጥቂት ሰዓታት ይወስዳል። እባክዎ ትንሽ ይታገሱን!\n\n"
+        f"❓ ጥያቄ ካለዎት ያግኙን፦ {SUPPORT_HANDLE}"
         if lang == "am"
         else
         f"🎉 <b>Registration and assessment complete!</b>\n\n"
-        f"We have received your payment and details. Simon is currently building your plan. "
-        f"It will be delivered right inside Bot #2 as soon as it's ready!\n\n"
-        f"Tap the button below to enter Bot #2 now! 👇"
+        f"We've received your payment and details and we're verifying them now. "
+        f"As soon as your payment is confirmed, we'll send you access to Bot #2 (your Client Portal).\n\n"
+        f"⏱️ This usually takes a few hours — thanks for your patience!\n\n"
+        f"❓ Questions? Contact Simon: {SUPPORT_HANDLE}"
     )
 
-    await query.edit_message_text(completion_text, reply_markup=portal_button, parse_mode="HTML")
+    await query.edit_message_text(completion_text, parse_mode="HTML")
     return ConversationHandler.END
 
 
@@ -1387,6 +1391,9 @@ async def admin_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception:
             logging.exception("Failed to activate client %s in Supabase", client_id)
 
+        # This is the ONLY place the client is sent the Bot #2 portal link,
+        # since this is the point where payment has actually been verified
+        # by an admin and is_active is set to True.
         portal_button = InlineKeyboardMarkup([[InlineKeyboardButton("🚀 Open Client Portal (Bot #2)", url=BOT_2_LINK)]])
 
         try:
